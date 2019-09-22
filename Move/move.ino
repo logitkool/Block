@@ -5,7 +5,6 @@
 #undef __AVR__
 
 #include "block.hpp"
-// #include "../commands.hpp"
 #include "commands.hpp"
 
 template<class T, size_t S>
@@ -18,7 +17,7 @@ constexpr size_t get_size(const T (&)[S])
 // for ATtiny85
 
 // 設定
-const BlockId::BlockId BLOCK_ID = { 0x80, 0x00, 0x01 }; // ブロックID
+const Block::BlockId BLOCK_ID = { 0x80, 0x00, 0x01 }; // ブロックID
 
 const unsigned long BAUDRATE = 19200;
 const int Rx_PIN = 3; // 共通Rx
@@ -34,8 +33,7 @@ bool idSent = false;
 bool isTerminal = true; // 終端ブロックかどうか
 uint8_t prev_command = 0xFF;
 const int MAX_ID = 4;
-// BlockId::BlockId known_ids[MAX_ID] = {BlockId::None, BlockId::None, BlockId::None, BlockId::None};
-BlockId::BlockId known_ids[MAX_ID];
+Block::BlockId known_ids[MAX_ID];
 
 Packetizer::Packer_<16> packer;
 Packetizer::Unpacker_<2, 16> unpacker;
@@ -52,7 +50,7 @@ void setup()
 
   for(unsigned int i = 0; i < MAX_ID; i++)
   {
-    known_ids[i] = BlockId::None;
+    known_ids[i] = Block::None;
   }
   
   unpacker.subscribe(0x00, callback);
@@ -155,7 +153,7 @@ void callback(const uint8_t* data, uint8_t size)
         // digitalWrite(LED_PIN, LOW);
         for(unsigned int i = 0; i < MAX_ID; i++)
         {
-          known_ids[i] = BlockId::None;
+          known_ids[i] = Block::None;
         }
 
         for(int i = 0; i < 3; i++)
