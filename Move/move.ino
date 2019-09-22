@@ -14,9 +14,8 @@ constexpr size_t get_size(const T (&)[S])
   return S;
 }
 
-// floc slave
+// ふろっく 動作ブロック
 // for ATtiny85
-// 汎用ファームウェア
 
 // 設定
 const BlockId::BlockId BLOCK_ID = { 0x80, 0x00, 0x01 }; // ブロックID
