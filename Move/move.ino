@@ -1,17 +1,8 @@
 #include <Arduino.h>
-#include <SoftwareSerial.h>
-#define __AVR__
-#include <Packetizer.h>
-#undef __AVR__
 
 #include "block.hpp"
 #include "commands.hpp"
-
-template<class T, size_t S>
-constexpr size_t get_size(const T (&)[S])
-{
-  return S;
-}
+#include "comm.hpp"
 
 // ふろっく 動作ブロック
 // for ATtiny85
@@ -24,76 +15,33 @@ const int Rx_PIN = 3; // 共通Rx
 const int Tx_CON_PIN = 1; // 接続方向Tx
 const int Tx_BRD_PIN = 2; // 接続方向以外のTx (BRD : BRoaDcast)
 const int LED_PIN = 0;
-const int LED2_PIN = 4;
-
-SoftwareSerial comBrdSide(Rx_PIN, Tx_BRD_PIN, true);
-SoftwareSerial comConSide(Rx_PIN, Tx_CON_PIN, true);
 
 bool idSent = false;
 bool isTerminal = true; // 終端ブロックかどうか
-uint8_t prev_command = 0xFF;
 const int MAX_ID = 4;
 Block::BlockId known_ids[MAX_ID];
 
-Packetizer::Packer_<16> packer;
-Packetizer::Unpacker_<2, 16> unpacker;
-void callback(const uint8_t* data, uint8_t size);
+Comm comm(BAUDRATE, Rx_PIN, Tx_BRD_PIN, Tx_CON_PIN);
+
+void onReceived(const uint8_t* data, uint8_t size);
 
 void setup()
 {
-  comBrdSide.begin(BAUDRATE);
+    comm.init();
 
-  pinMode(LED_PIN, OUTPUT);
-  digitalWrite(LED_PIN, LOW);
-  // pinMode(LED2_PIN, OUTPUT);
-  // digitalWrite(LED2_PIN, LOW);
+    pinMode(LED_PIN, OUTPUT);
+    digitalWrite(LED_PIN, LOW);
 
-  for(unsigned int i = 0; i < MAX_ID; i++)
-  {
-    known_ids[i] = Block::None;
-  }
-  
-  unpacker.subscribe(0x00, callback);
+    for(unsigned int i = 0; i < MAX_ID; i++)
+    {
+        known_ids[i] = Block::None;
+    }
+    
+    comm.subscribe(onReceived);
 
 }
 
-void sendData(const SoftwareSerial& com, const uint8_t* data, size_t size)
-{
-  packer.init();
-
-  for(auto i = 0;i < size;i++)
-  {
-    packer << data[i];
-  }
-  packer << Packetizer::endp();
-
-  com.write(packer.data(), packer.size());
-  prev_command = data[0];
-}
-
-void sendToConSide(const uint8_t* data, size_t size)
-{
-  comBrdSide.end();
-  comConSide.begin(BAUDRATE);
-
-  sendData(comConSide, data, size);
-
-  comConSide.end();
-  comBrdSide.begin(BAUDRATE);
-}
-
-void sendToBrdSide(const uint8_t* data, size_t size)
-{
-  sendData(comBrdSide, data, size);
-}
-
-void sendToAll(const uint8_t* data, size_t size)
-{
-  sendToBrdSide(data, size);
-  sendToConSide(data, size);
-}
-
-void callback(const uint8_t* data, uint8_t size)
+void onReceived(const uint8_t* data, uint8_t size)
 {
     if (size == 0) return;
 
@@ -118,52 +66,72 @@ void callback(const uint8_t* data, uint8_t size)
 
             if (isKnown)
             {
-              if (prev_command == COM_ASK) break;
-              uint8_t coms[] = {COM_ASK, BLOCK_ID.Uid_H, BLOCK_ID.Uid_L };
-              sendToConSide(coms, get_size(coms));
+              if (comm.getPrevCommand() == COM_ASK) break;
+              comm.writeToConSide(COM_ASK, BLOCK_ID.Uid_H, BLOCK_ID.Uid_L);
             } else
             {
-              uint8_t coms[] = {COM_RET, data[1], data[2], BLOCK_ID.TypeId, BLOCK_ID.Uid_H, BLOCK_ID.Uid_L };
-              sendToAll(coms, get_size(coms));
+                comm.writeToAll(COM_RET,
+                    data[1], data[2],
+                    BLOCK_ID.TypeId, BLOCK_ID.Uid_H, BLOCK_ID.Uid_L
+                );
             }
 
             idSent = true;
 
         }
-
         break;
+
     case COM_RET:
-        if (!idSent) break;
-
         {
+            if (!idSent) break;
             isTerminal = false;
-            // digitalWrite(LED_PIN, HIGH);
-            if(prev_command == COM_RET) break;
-            sendToBrdSide(data, size);
+            if(comm.getPrevCommand() == COM_RET) break;
+            comm.writeToBrdSide(data, size);
         }
         break;
 
-      case COM_RST:
-      {
-        if (!idSent) break;
-
-        idSent = false;
-        isTerminal = true;
-        prev_command = 0xFF;
-        // digitalWrite(LED_PIN, LOW);
-        for(unsigned int i = 0; i < MAX_ID; i++)
+    case COM_TXD:
         {
-          known_ids[i] = Block::None;
+            if (!idSent) break;
+            if (comm.getPrevCommand() == COM_TXD) break;
+            if (data[1] == BLOCK_ID.Uid_H && data[2] == BLOCK_ID.Uid_L)
+            {
+                switch (data[3])
+                {
+                case DAT_LED:
+                    digitalWrite(LED_PIN, (data[4] == 0x01));
+                    break;
+                
+                default:
+                    break;
+                }
+            } else
+            {
+                comm.writeToConSide(data, size);
+            }
         }
+        break;
 
-        for(int i = 0; i < 3; i++)
+    case COM_RST:
         {
-          uint8_t coms[] = {COM_RST};
-          sendToConSide(coms, get_size(coms));
-        }
+            if (!idSent) break;
 
-      }
-      break;
+            idSent = false;
+            isTerminal = true;
+            comm.init();
+            
+            for(unsigned int i = 0; i < MAX_ID; i++)
+            {
+                known_ids[i] = Block::None;
+            }
+
+            for(int i = 0; i < 3; i++)
+            {
+                comm.writeToConSide(COM_RST);
+            }
+
+        }
+        break;
 
     default:
         break;
@@ -171,25 +139,19 @@ void callback(const uint8_t* data, uint8_t size)
 
 }
 
-long time = millis();
-int state = LOW;
+// long time = millis();
+// int state = LOW;
 
 void loop()
 {
-  while (const int size = comBrdSide.available())
-  {
-    // buffering
-    char data[size];
-    comBrdSide.readBytes(data, size);
-    unpacker.feed(data, size);
-  }
-
-  if (idSent || millis() - time > 500)
-  {
-    state = state == LOW ? HIGH : LOW;
-    state = idSent ? HIGH : state;
-    digitalWrite(LED_PIN, state);
-    time = millis();
-  }
+    comm.listen();
+    
+    //   if (idSent || millis() - time > 500)
+    //   {
+    //     state = state == LOW ? HIGH : LOW;
+    //     state = idSent ? HIGH : state;
+    //     digitalWrite(LED_PIN, state);
+    //     time = millis();
+    //   }
 
 }

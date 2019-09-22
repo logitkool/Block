@@ -1,11 +1,16 @@
 #pragma once
 
-struct BlockId
+namespace Block
 {
-    unsigned int TypeId;  // 1byte (Max: 0xFF)
-    // Uid: 2byte (Max: 0xFFFF)
-    unsigned int Uid_H;
-    unsigned int Uid_L;
+    struct BlockId
+    {
+        // 1byte (Max: 0xFF)
+        uint8_t TypeId;
+        // Uid: 2byte (Max: 0xFFFF)
+        uint8_t Uid_H;
+        uint8_t Uid_L;
+    };
+    
+    const BlockId None = { 0xFF, 0xFF, 0xFF };
+    
 };
-
-
