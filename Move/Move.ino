@@ -3,12 +3,13 @@
 #include "block.hpp"
 #include "commands.hpp"
 #include "comm.hpp"
+#include "config.hpp"
 
 // ふろっく 動作ブロック
 // for ATtiny85
 
 // 設定
-const Block::BlockId BLOCK_ID = { 0x80, 0x00, 0x01 }; // ブロックID
+Block::BlockId BLOCK_ID = { 0x80, 0x00, 0x01 };
 
 const unsigned long BAUDRATE = 19200;
 const int Rx_PIN = 3; // 共通Rx
@@ -22,11 +23,14 @@ const int MAX_ID = 4;
 Block::BlockId known_ids[MAX_ID];
 
 BlockComm comm(BAUDRATE, Rx_PIN, Tx_BRD_PIN, Tx_CON_PIN);
+Config::Config config;
 
 void onReceived(const uint8_t* data, uint8_t size);
 
 void setup()
 {
+    config.load();
+
     comm.init();
 
     pinMode(LED_PIN, OUTPUT);
@@ -89,6 +93,12 @@ void onReceived(const uint8_t* data, uint8_t size)
         }
         break;
 
+    case COM_SET:
+        {
+            
+        }
+        break;
+
     case COM_TXD:
         {
             if (!idSent) break;
@@ -138,8 +148,8 @@ void onReceived(const uint8_t* data, uint8_t size)
 
 }
 
-// long time = millis();
-// int state = LOW;
+long time = millis();
+int state = LOW;
 
 void loop()
 {
