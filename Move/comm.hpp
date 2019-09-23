@@ -1,6 +1,6 @@
 #pragma once
 
-// communication lib
+// inter-block communication library
 // for ATtiny85
 
 #include <SoftwareSerial.h>
@@ -8,183 +8,220 @@
 #include <Packetizer.h>
 #undef __AVR__
 
-class Comm
+class BlockComm
 {
 public:
-    Comm(const unsigned long _baudrate, const uint8_t _rxpin, const uint8_t _brdpin, const uint8_t _conpin)
-        : BaudRate(_baudrate)
+    // ブロック間通信クラス
+    // 
+    // 動作ブロック向けコンストラクタです。
+    // 使用前にinit()を呼び出す必要があります。
+    BlockComm(const unsigned long& _baudrate, const uint8_t& _rxpin, const uint8_t& _tx_brd, const uint8_t& _tx_con)
+        : BAUDRATE(_baudrate)
     {
-        comConTrue = new SoftwareSerial(_rxpin, _conpin, true);
-        comBroadcast = new SoftwareSerial(_rxpin, _brdpin, true);
-
-        isTwoCon = false;
+        comBrd = new SoftwareSerial(_rxpin, _tx_brd, true);
+        comTrue = new SoftwareSerial(_rxpin, _tx_con, true);
+        useTwoPorts = false;
     }
 
-    Comm(const unsigned long _baudrate, const uint8_t _rxpin, const uint8_t _brdpin, const uint8_t _truepin, const uint8_t _falsepin)
-        : BaudRate(_baudrate)
+    // ブロック間通信クラス
+    // 
+    // 分岐/繰り返しブロック向けコンストラクタです。
+    // 使用前にinit()を呼び出す必要があります。
+    // 繰り返しブロックでは、Trueを繰り返し方向、Falseを終了方向に読み変えてください。
+    BlockComm(const unsigned long& _baudrate, const uint8_t& _rxpin, const uint8_t& _tx_brd, const uint8_t& _tx_conTrue, const uint8_t& _tx_conFalse)
+        : BAUDRATE(_baudrate)
     {
-        comConTrue = new SoftwareSerial(_rxpin, _truepin, true);
-        comConFalse = new SoftwareSerial(_rxpin, _falsepin, true);
-        comBroadcast = new SoftwareSerial(_rxpin, _brdpin, true);
-
-        isTwoCon = true;
+        comBrd = new SoftwareSerial(_rxpin, _tx_brd, true);
+        comTrue = new SoftwareSerial(_rxpin, _tx_conTrue, true);
+        comFalse = new SoftwareSerial(_rxpin, _tx_conFalse, true);
+        useTwoPorts = true;
     }
 
-    inline void init()
+    // ブロック間通信の初期化を行います。
+    // setup()内で呼び出すこと
+    void init()
     {
-        comBroadcast->begin(BaudRate);
-        prev_command = 0xFF;
+        comBrd->begin(BAUDRATE);
     }
 
+    // 受信コールバックを登録します。
+    // index = 0x00 に登録されます。
     void subscribe(void (*callback)(const uint8_t* data, uint8_t size))
     {
-        unpacker.subscribe(0, callback);
+        unpacker.subscribe(0x00, callback);
     }
 
+    // 共通受信ポートでデータを待ち受け、受信データがある場合はコールバックを呼び出します。
+    // loop()内で呼び出すこと。
     void listen()
     {
-        while (const int size = comBroadcast->available())
+        while(const int size = comBrd->available())
         {
             uint8_t data[size];
-            comBroadcast->readBytes(data, size);
+            comBrd->readBytes(data, size);
             unpacker.feed(data, size);
         }
     }
 
-    // Con/True side
+    // 引数で与えられたデータをブロードキャストポートに送信します。
     template<typename ...Param>
-    void writeToConSide(const uint8_t& hex, Param& ...params)
+    void sendToBrdPort(int hex, Param ...params)
     {
-        writeToTrueSide(hex, params...);
+        packer.init();
+        pack(hex, params...);
+        comBrd->write(packer.data(), packer.size());
+        comBrd->flush();
+
+        prev_command = hex;
     }
 
-    void writeToConSide(const uint8_t* data, const uint8_t& size)
+    // 配列で与えられたデータをブロードキャストポートに送信します。
+    void writeToBrdPort(const uint8_t* data, const uint8_t& size)
     {
-        writeToTrueSide(data, size);
+        writeData(comBrd, data, size);
     }
 
+    // 引数で与えられたデータを真側(繰り返し側)ポートに送信します。
     template<typename ...Param>
-    void writeToTrueSide(const uint8_t& hex, Param& ...params)
+    void sendToTruePort(int hex, Param ...params)
     {
-        comBroadcast->end();
-        comConTrue->begin(BaudRate);
+        comBrd->end();
+        comTrue->begin(BAUDRATE);
 
-        writeData(comConTrue, hex, params...);
+        packer.init();
+        pack(hex, params...);
+        comTrue->write(packer.data(), packer.size());
+        comTrue->flush();
 
-        comConTrue->end();
-        comBroadcast->begin(BaudRate);
+        comTrue->end();
+        comBrd->begin(BAUDRATE);
+
+        prev_command = hex;
     }
 
-    void writeToTrueSide(const uint8_t* data, const uint8_t& size)
-    {
-        comBroadcast->end();
-        comConTrue->begin(BaudRate);
-
-        comConTrue->write(data, size);
-
-        comConTrue->end();
-        comBroadcast->begin(BaudRate);
-    }
-
-    // False side
+    // 引数で与えられたデータを接続方向ポートに送信します。
     template<typename ...Param>
-    void writeToFalseSide(const uint8_t& hex, Param& ...params)
+    void sendToConPort(int hex, Param ...params)
     {
-        if (!isTwoCon)
+        sendToTruePort(hex, params...);
+    }
+
+    // 配列で与えられたデータを真側(繰り返し側)ポートに送信します。
+    void writeToTruePort(const uint8_t* data, const uint8_t& size)
+    {
+        comBrd->end();
+        comTrue->begin(BAUDRATE);
+
+        writeData(comTrue, data, size);
+
+        comTrue->end();
+        comBrd->begin(BAUDRATE);
+    }
+
+    // 配列で与えられたデータを接続方向ポートに送信します。
+    void writeToConPort(const uint8_t* data, const uint8_t& size)
+    {
+        writeToTruePort(data, size);
+    }
+
+    // 引数で与えられたデータを偽側(繰り返し終了側)ポートに送信します。
+    template<typename ...Param>
+    void sendToFalsePort(int hex, Param ...params)
+    {
+        if (!useTwoPorts) return;
+
+        comBrd->end();
+        comFalse->begin(BAUDRATE);
+
+        packer.init();
+        pack(hex, params...);
+        comFalse->write(packer.data(), packer.size());
+        comFalse->flush();
+
+        comFalse->end();
+        comBrd->begin(BAUDRATE);
+
+        prev_command = hex;
+    }
+
+    // 配列で与えられたデータを偽側(繰り返し終了側)ポートに送信します。
+    void writeToFalsePort(const uint8_t* data, const uint8_t& size)
+    {
+        if (!useTwoPorts) return;
+
+        comBrd->end();
+        comFalse->begin(BAUDRATE);
+
+        writeData(comFalse, data, size);
+
+        comFalse->end();
+        comBrd->begin(BAUDRATE);
+    }
+
+    // 引数で与えられたデータを全てのポートに送信します。
+    template<typename ...Param>
+    void sendToAllPorts(int hex, Param ...params)
+    {
+        sendToBrdPort(hex, params...);
+        sendToTruePort(hex, params...);
+        if (useTwoPorts)
         {
-            return;
+            sendToFalsePort(hex, params...);
         }
-
-        comBroadcast->end();
-        comConFalse->begin(BaudRate);
-
-        writeData(comConFalse, hex, params...);
-
-        comConFalse->end();
-        comBroadcast->begin(BaudRate);
     }
 
-    void writeToFalseSide(const uint8_t* data, const uint8_t& size)
+    // 配列で与えられたデータを全てのポートに送信します。
+    void writeToAllPorts(const uint8_t* data, const uint8_t& size)
     {
-        if (!isTwoCon)
+        writeToBrdPort(data, size);
+        writeToTruePort(data, size);
+        if (useTwoPorts)
         {
-            return;
-        }
-
-        comBroadcast->end();
-        comConFalse->begin(BaudRate);
-
-        comConFalse->write(data, size);
-
-        comConFalse->end();
-        comBroadcast->begin(BaudRate);
-    }
-
-    // Broadcast sides
-    template<typename ...Param>
-    void writeToBrdSide(const uint8_t& hex, Param& ...params)
-    {
-        writeData(comBroadcast, hex, params...);
-    }
-
-    void writeToBrdSide(const uint8_t* data, const uint8_t& size)
-    {
-        comBroadcast->write(data, size);
-    }
-
-    // All 4 sides
-    template<typename ...Param>
-    void writeToAll(const uint8_t& hex, Param& ...params)
-    {
-        writeToBrdSide(hex, params...);
-        writeToConSide(hex, params...);
-        if (isTwoCon)
-        {
-            writeToFalseSide(hex, params...);
+            writeToFalsePort(data, size);
         }
     }
 
-    void writeToAll(const uint8_t* data, const uint8_t& size)
+    // 直前に送信したコマンドの情報をリセットします。
+    void resetPrevCommand()
     {
-        writeToBrdSide(data, size);
-        writeToConSide(data, size);
-        if (isTwoCon)
-        {
-            writeToFalseSide(data, size);
-        }
+        prev_command = 0xFF;
     }
-
-    inline const uint8_t getPrevCommand()
+    
+    // 直前に送信したコマンドを返します。
+    uint8_t getPrevCommand()
     {
         return prev_command;
     }
 
 private:
-    const unsigned long BaudRate;
-    bool isTwoCon;
-    SoftwareSerial* comConTrue;
-    SoftwareSerial* comConFalse;
-    SoftwareSerial* comBroadcast;
+    SoftwareSerial* comBrd;
+    SoftwareSerial* comTrue;
+    SoftwareSerial* comFalse;
 
+    bool useTwoPorts;
+
+    const unsigned long BAUDRATE;
+    uint8_t prev_command = 0xFF;
     Packetizer::Unpacker_<2, 16> unpacker;
     Packetizer::Packer_<16> packer;
-    uint8_t prev_command;
 
-    template<typename ...Param>
-    void writeData(SoftwareSerial* com, const uint8_t& hex, Param& ...params)
+    void writeData(const SoftwareSerial* com, const uint8_t* data, const uint8_t& size)
     {
         packer.init();
-        
-        pack(hex, params...);
+        for(uint8_t i = 0; i < size; i++)
+        {
+            packer << data[i];
+        }
+        packer << Packetizer::endp();
 
         com->write(packer.data(), packer.size());
         com->flush();
 
-        prev_command = hex;
+        prev_command = data[0];
     }
 
     template<typename ...Param>
-    void pack(const uint8_t& hex, Param ...params)
+    void pack(int hex, Param ...params)
     {
         append(hex);
         pack(params...);
@@ -195,7 +232,7 @@ private:
         packer << Packetizer::endp();
     }
 
-    void append(const uint8_t& hex)
+    void append(int hex)
     {
         packer << hex;
     }

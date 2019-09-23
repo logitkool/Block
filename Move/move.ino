@@ -21,7 +21,7 @@ bool isTerminal = true; // 終端ブロックかどうか
 const int MAX_ID = 4;
 Block::BlockId known_ids[MAX_ID];
 
-Comm comm(BAUDRATE, Rx_PIN, Tx_BRD_PIN, Tx_CON_PIN);
+BlockComm comm(BAUDRATE, Rx_PIN, Tx_BRD_PIN, Tx_CON_PIN);
 
 void onReceived(const uint8_t* data, uint8_t size);
 
@@ -38,7 +38,6 @@ void setup()
     }
     
     comm.subscribe(onReceived);
-
 }
 
 void onReceived(const uint8_t* data, uint8_t size)
@@ -58,22 +57,22 @@ void onReceived(const uint8_t* data, uint8_t size)
             bool isKnown = false;
             for(unsigned int i = 0; i < idx; i++)
             {
-              if (known_ids[i].Uid_H == data[1] && known_ids[i].Uid_L == data[2])
-              {
-                isKnown = true;
-              }
+                if (known_ids[i].Uid_H == data[1] && known_ids[i].Uid_L == data[2])
+                {
+                    isKnown = true;
+                }
             }
 
             if (isKnown)
             {
-              if (comm.getPrevCommand() == COM_ASK) break;
-              comm.writeToConSide(COM_ASK, BLOCK_ID.Uid_H, BLOCK_ID.Uid_L);
+                if (comm.getPrevCommand() == COM_ASK) break;
+                comm.sendToConPort(COM_ASK, BLOCK_ID.Uid_H, BLOCK_ID.Uid_L);
             } else
             {
-                comm.writeToAll(COM_RET,
+                comm.sendToAllPorts(COM_RET,
                     data[1], data[2],
-                    BLOCK_ID.TypeId, BLOCK_ID.Uid_H, BLOCK_ID.Uid_L
-                );
+                    BLOCK_ID.TypeId, BLOCK_ID.Uid_H, BLOCK_ID.Uid_L);
+                
             }
 
             idSent = true;
@@ -86,7 +85,7 @@ void onReceived(const uint8_t* data, uint8_t size)
             if (!idSent) break;
             isTerminal = false;
             if(comm.getPrevCommand() == COM_RET) break;
-            comm.writeToBrdSide(data, size);
+            comm.writeToBrdPort(data, size);
         }
         break;
 
@@ -107,18 +106,18 @@ void onReceived(const uint8_t* data, uint8_t size)
                 }
             } else
             {
-                comm.writeToConSide(data, size);
+                comm.writeToConPort(data, size);
             }
         }
         break;
 
     case COM_RST:
         {
-            if (!idSent) break;
+            if (comm.getPrevCommand() == COM_RST) break;
 
             idSent = false;
             isTerminal = true;
-            comm.init();
+            comm.resetPrevCommand();
             
             for(unsigned int i = 0; i < MAX_ID; i++)
             {
@@ -127,7 +126,7 @@ void onReceived(const uint8_t* data, uint8_t size)
 
             for(int i = 0; i < 3; i++)
             {
-                comm.writeToConSide(COM_RST);
+                comm.sendToConPort(COM_RST);
             }
 
         }
@@ -145,13 +144,13 @@ void onReceived(const uint8_t* data, uint8_t size)
 void loop()
 {
     comm.listen();
-    
-    //   if (idSent || millis() - time > 500)
-    //   {
+
+    // if (idSent || millis() - time > 500)
+    // {
     //     state = state == LOW ? HIGH : LOW;
     //     state = idSent ? HIGH : state;
     //     digitalWrite(LED_PIN, state);
     //     time = millis();
-    //   }
+    // }
 
 }

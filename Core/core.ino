@@ -14,9 +14,9 @@ const unsigned int TIMEOUT = 500; // ms
 const unsigned int RESENT_COUNT = 3;
 const unsigned int INTERVAL = 1500; // ms
 
-Comm comm(BAUDRATE);
+BlockComm comm(BAUDRATE, 2);
 
-const Block::BlockId BLOCK_ID = { 0x81, 0x00, 0x01 };
+const Block::BlockId BLOCK_ID = { 0x81, 0x00, 0x02 };
 Block::BlockId ids [MAX_BLOCK];
 int _index = 0;
 bool isScanning = false;
@@ -28,7 +28,7 @@ void next()
 {
     Block::BlockId dest_id = ids[_index];
 
-    comm.writeToConSide(COM_TXD, dest_id.Uid_H, dest_id.Uid_L, DAT_LED, 0x01);
+    comm.sendToBlock(COM_TXD, dest_id.Uid_H, dest_id.Uid_L, DAT_LED, 0x01);
 
     _index++;
 }
@@ -42,7 +42,7 @@ void setup()
 
     for(unsigned int i = 0; i < MAX_BLOCK; i++)
     {
-    ids[i] = Block::None;
+        ids[i] = Block::None;
     }
 
     comm.subscribe(onReceived);
@@ -69,9 +69,9 @@ void onReceived(const uint8_t* data, uint8_t size)
             int i = 0;
             while(ids[i].TypeId != 0xFF) i++;
             if (i >= MAX_BLOCK) break;
-            ids[i].TypeId = data[1];
-            ids[i].Uid_H = data[2];
-            ids[i].Uid_L = data[3];
+            ids[i].TypeId = data[3];
+            ids[i].Uid_H = data[4];
+            ids[i].Uid_L = data[5];
             askSent = false;
             askCount = 0;
         }
@@ -96,7 +96,7 @@ void loop()
     }
     if (isScanning && !askSent)
     {
-        comm.writeToConSide(COM_ASK, BLOCK_ID.Uid_H, BLOCK_ID.Uid_L);
+        comm.sendToBlock(COM_ASK, BLOCK_ID.Uid_H, BLOCK_ID.Uid_L);
         Serial.println("wrote : COM_ASK");
         askSent = true;
         askCount++;
@@ -127,15 +127,15 @@ void loop()
             {
                 for(unsigned int i = 0; i < MAX_BLOCK; i++)
                 {
-                if (ids[i].TypeId != 0xFF)
-                {
-                    Serial.print("[tid=");
-                    Serial.print(String(ids[i].TypeId, HEX));
-                    Serial.print(", uid=");
-                    Serial.print(String(ids[i].Uid_H, HEX));
-                    Serial.print(String(ids[i].Uid_L, HEX));
-                    Serial.print("] -> ");
-                }
+                    if (ids[i].TypeId != 0xFF)
+                    {
+                        Serial.print("[tid=");
+                        Serial.print(String(ids[i].TypeId, HEX));
+                        Serial.print(", uid=");
+                        Serial.print(String(ids[i].Uid_H, HEX));
+                        Serial.print(String(ids[i].Uid_L, HEX));
+                        Serial.print("] -> ");
+                    }
                 }
                 Serial.println("");
                 Serial.println("completed.");
@@ -153,7 +153,7 @@ void loop()
                 askCount = 0;
                 askSent = false;
                 lastSent = 0;
-                comm.writeToConSide(COM_RST);
+                comm.sendToBlock(COM_RST);
                 Serial.println("wrote : COM_RST");
                 Serial.println("completed.");
             }
@@ -163,12 +163,12 @@ void loop()
             {
                 if (ledState)
                 {
-                    comm.writeToConSide(COM_TXD, 0x00, 0x01, DAT_LED, 0x00);
+                    comm.sendToBlock(COM_TXD, 0x00, 0x01, DAT_LED, 0x00);
                     Serial.println("wrote : COM_TXD");
                     Serial.println("led off");
                 } else
                 {
-                    comm.writeToConSide(COM_TXD, 0x00, 0x01, DAT_LED, 0x01);
+                    comm.sendToBlock(COM_TXD, 0x00, 0x01, DAT_LED, 0x01);
                     Serial.println("wrote : COM_TXD");
                     Serial.println("led on");
                 }
@@ -178,7 +178,7 @@ void loop()
 
         case 'w':
             {
-                comm.writeToConSide(COM_ASK, BLOCK_ID.Uid_H, BLOCK_ID.Uid_L);
+                comm.sendToBlock(COM_ASK, BLOCK_ID.Uid_H, BLOCK_ID.Uid_L);
                 Serial.println("wrote : COM_ASK");
             }
             break;
