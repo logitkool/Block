@@ -123,6 +123,28 @@ void loop()
         }
         break;
 
+        case 'i':
+        {
+            Serial.println("set id...");
+            comm.sendToBlock(COM_CFG);
+            // comm.sendToBlock(COM_SET, 0x01, 0x11);
+            comm.sendToBlock(COM_SET, 0x02, 0x11, 0x01, 0x01);
+            comm.sendToBlock(COM_SET, 0x01, 0x01);
+            comm.sendToBlock(COM_APL);
+            Serial.println("sent.");
+        }
+        break;
+
+        case 'd':
+        {
+            Serial.println("set debug mode...");
+            comm.sendToBlock(COM_CFG);
+            comm.sendToBlock(COM_SET, 0x01, 0x12);
+            comm.sendToBlock(COM_APL);
+            Serial.println("sent.");
+        }
+        break;
+
         case 'p':
             {
                 for(unsigned int i = 0; i < MAX_BLOCK; i++)
