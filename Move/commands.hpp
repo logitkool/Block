@@ -2,9 +2,9 @@
 
 // 0x0- : config
 const uint8_t COM_RST = 0x01;
-const uint8_t COM_SET = 0x02;
-const uint8_t COM_MOD = 0x11;
-const uint8_t COM_APL = 0x12;
+const uint8_t COM_CFG = 0x81;
+const uint8_t COM_APL = 0x82;
+const uint8_t COM_SET = 0x91;
 
 // 0xA- : block scan
 const uint8_t COM_ASK = 0xA0;
