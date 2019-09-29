@@ -1,4 +1,9 @@
 #include <Arduino.h>
+#include <WiFi.h>
+#include <ESPAsyncWebServer.h>
+#include <SPIFFS.h>
+#include <ESPmDNS.h>
+#include <ArduinoJson.h>
 
 #include "block.hpp"
 #include "commands.hpp"
@@ -16,13 +21,96 @@ const unsigned int INTERVAL = 1500; // ms
 
 BlockComm comm(BAUDRATE, 2);
 
-const Block::BlockId BLOCK_ID = { 0x81, 0x00, 0x02 };
+const Block::BlockId BLOCK_ID = { 0x81, 0x00, 0x01 };
 Block::BlockId ids [MAX_BLOCK];
 int _index = 0;
 bool isScanning = false;
 bool askSent = false;
 int askCount = 0;
 int lastSent = 0;
+
+// Wi-Fi
+const char* hostname = "floc_core_810001";
+const char* ssid = "oykdnAPBansui_g";
+const char* password = "a9327362a86761a528e7696dc60bfab7ce81cd0285f46f8c34d8150fdbb17cd7"; // PSK
+AsyncWebServer server(80);
+AsyncWebSocket ws("/ws");
+
+void notFound(AsyncWebServerRequest* request)
+{
+    request->send(404, "text/plain", "[404] Not found");
+}
+
+void onEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType type, void* arg, uint8_t* data, size_t len)
+{
+    const char delimiter = ' ';
+
+    if(type == WS_EVT_CONNECT)
+    {
+        Serial.printf("ws(url=%s,id=%u) connected.\r\n", server->url(), client->id());
+    }
+    else if(type == WS_EVT_DISCONNECT)
+    {
+        Serial.println("Client disconnected.");
+    }
+    else if(type == WS_EVT_DATA)
+    {
+        String msgs[8];
+        int idx = 0;
+        uint16_t id = client->id();
+        AwsFrameInfo* info = (AwsFrameInfo*)arg;
+        if(info->opcode == WS_TEXT)
+        {
+            for(size_t i = 0; i < info->len; i++)
+            {
+                if ((char)data[i] == delimiter)
+                {
+                    if (i < info->len - 1) idx++;
+                } else
+                {
+                    msgs[idx] += (char)data[i];
+                }
+            }
+        }
+        if (idx == 0 && msgs[0].length() == 0) return;
+
+        Serial.print("[");
+        Serial.print(id);
+        Serial.print("] ");
+        Serial.println(msgs[0]);
+
+        if (msgs[0] == "ids")
+        {
+            DynamicJsonDocument doc(1024);
+            JsonArray arrIds = doc.createNestedArray("ids");
+
+            for(unsigned int i = 0; i < MAX_BLOCK; i++)
+            {
+                if (ids[i].TypeId != 0xFF)
+                {
+                    JsonObject block = arrIds.createNestedObject();
+                    block["type"] = String(ids[i].TypeId, HEX);
+                    block["uid"] = String(((long)(ids[i].Uid_H) << 8) + ids[i].Uid_L, HEX);
+                }
+            }
+
+            char buffer[2048];
+            serializeJsonPretty(doc, buffer);
+            ws.text(id, buffer);
+        } else if (msgs[0] == "setid")
+        {
+            String buf = "msgs = ";
+            for(int i = 0; i <= idx; i++)
+            {
+                buf += msgs[i] + ", ";
+            }
+            ws.text(id, buf);
+        } else
+        {
+            ws.text(id, "message doesn't match any command pattern.");
+        }
+    }
+}
 
 void next()
 {
@@ -38,13 +126,67 @@ void onReceived(const uint8_t* data, uint8_t size);
 void setup()
 {
     Serial.begin(BAUDRATE);
-    comm.init();
 
+    // SPIFFS
+    SPIFFS.begin();
+
+    // Wi-Fi
+    Serial.println();
+    Serial.print("Connecting to ");
+    Serial.print(ssid);
+
+    WiFi.begin(ssid, password);
+
+    while (WiFi.status() != WL_CONNECTED)
+    {
+        delay(500);
+        Serial.print(".");
+    }
+
+    Serial.println("");
+    Serial.println("WiFi connected");
+    Serial.println("IP address: ");
+    Serial.println(WiFi.localIP());
+
+    if (!MDNS.begin(hostname))
+    {
+        Serial.println("Error setting up MDNS responder!");
+        while(1)
+        {
+            delay(1000);
+        }
+    }
+    Serial.println("mDNS responder started");
+    Serial.print("Now, you can access this ESP32 by <http://");
+    Serial.print(hostname);
+    Serial.println(".local/> .");
+
+    // Server
+    ws.onEvent(onEvent);
+    server.addHandler(&ws);
+
+    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+        AsyncWebServerResponse* response = request->beginResponse(SPIFFS, "/index.html", "text/html");
+        if (response == NULL)
+        {
+            notFound(request);
+            return;
+        }
+        response->setCode(200);
+        request->send(response);
+    });
+
+    server.onNotFound(notFound);
+
+    server.begin();
+
+    // Block
+    comm.init();
     for(unsigned int i = 0; i < MAX_BLOCK; i++)
     {
         ids[i] = Block::None;
     }
-
     comm.subscribe(onReceived);
 
     Serial.println("initialized.");
