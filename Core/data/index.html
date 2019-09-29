@@ -3,8 +3,37 @@
     <head>
         <title>ふろっく</title>
         <meta charset="UTF-8" />
+
+        <script type="text/javascript" src="/static/jquery.js"></script>
+        <script type="text/javascript" src="/static/popper.js"></script>
+        <link rel="stylesheet" href="/static/bootstrap.css">
+        <script type="text/javascript" src="/static/bootstrap.js"></script>
+
+        <!-- <script type="text/javascript" src="static/flocMain.js"></script> -->
     </head>
     <body>
-        <h1>ふろっくコアブロック WebUI</h1>
+        <nav class="navbar navbar-expand-sm navbar-dark bg-dark">
+            <a href="/" class="navbar-brand">ふろっく コアブロック</a>
+            <button class="navbar-toggler" type="button"
+                data-toggle="collapse"
+                data-target="#navmenu"
+                aria-controls="navmenu"
+                aria-expanded="false"
+                aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navmenu">
+                <div class="navbar-nav">
+                <a class="nav-item nav-link" href="/config">Config</a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container" style="padding: 30px 0 0 0;">
+
+            <h1>ふろっく コアブロック WebUI</h1>
+            <h2>(ID: %ID%)</h2>
+            
+        </div>
     </body>
 </html>

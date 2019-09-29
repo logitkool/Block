@@ -41,6 +41,17 @@ void notFound(AsyncWebServerRequest* request)
     request->send(404, "text/plain", "[404] Not found");
 }
 
+String processor(const String& var)
+{
+  if(var == "ID")
+  {
+      char buf[8];
+      sprintf(buf, "%02X%02X%02X", BLOCK_ID.TypeId, BLOCK_ID.Uid_H, BLOCK_ID.Uid_L);
+      return String(buf);
+  }
+  return String();
+}
+
 void onEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType type, void* arg, uint8_t* data, size_t len)
 {
     const char delimiter = ' ';
@@ -99,12 +110,55 @@ void onEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType 
             ws.text(id, buffer);
         } else if (msgs[0] == "setid")
         {
-            String buf = "msgs = ";
-            for(int i = 0; i <= idx; i++)
+            if (idx + 1 < 4) return;
+            uint8_t tid = strtol(msgs[1].c_str(), 0, 16);
+            uint8_t uid_h = strtol(msgs[2].c_str(), 0, 16);
+            uint8_t uid_l = strtol(msgs[3].c_str(), 0, 16);
+            
+            comm.sendToBlock(COM_CFG);
+            comm.sendToBlock(COM_SET, 0x02, tid, uid_h, uid_l);
+            comm.sendToBlock(COM_SET, 0x01, 0x01);
+            comm.sendToBlock(COM_APL);
+
+            ws.text(id, "ok");
+        } else if (msgs[0] == "setmode")
+        {
+            if (idx + 1 < 2) return;
+            uint8_t mode = strtol(msgs[1].c_str(), 0, 16);
+
+            comm.sendToBlock(COM_CFG);
+            comm.sendToBlock(COM_SET, 0x01, mode);
+            comm.sendToBlock(COM_APL);
+
+            ws.text(id, "ok");
+        } else if (msgs[0] == "reset")
+        {
+            Serial.println("Resetting...");
+            for(unsigned int i = 0; i < MAX_BLOCK; i++)
             {
-                buf += msgs[i] + ", ";
+                ids[i] = Block::None;
             }
-            ws.text(id, buf);
+            isScanning = false;
+            askCount = 0;
+            askSent = false;
+            lastSent = 0;
+            comm.sendToBlock(COM_RST);
+            Serial.println("wrote : COM_RST");
+            Serial.println("completed.");
+
+            ws.text(id, "ok");
+        } else if (msgs[0] == "scan")
+        {
+            Serial.println("Scanning...");
+            isScanning = true;
+
+            ws.text(id, "scan start");
+        } else if (msgs[0] == "ask")
+        {
+            comm.sendToBlock(COM_ASK, BLOCK_ID.Uid_H, BLOCK_ID.Uid_L);
+            Serial.println("wrote : COM_ASK");
+
+            ws.text(id, "ok");
         } else
         {
             ws.text(id, "message doesn't match any command pattern.");
@@ -165,17 +219,14 @@ void setup()
     ws.onEvent(onEvent);
     server.addHandler(&ws);
 
-    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
+    server.on("/config", HTTP_GET, [](AsyncWebServerRequest* request)
     {
-        AsyncWebServerResponse* response = request->beginResponse(SPIFFS, "/index.html", "text/html");
-        if (response == NULL)
-        {
-            notFound(request);
-            return;
-        }
-        response->setCode(200);
-        request->send(response);
+        request->redirect("/config.html");
     });
+    
+    server.serveStatic("/", SPIFFS, "/")
+        .setDefaultFile("index.html")
+        .setTemplateProcessor(processor);
 
     server.onNotFound(notFound);
 
