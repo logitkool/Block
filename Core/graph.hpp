@@ -37,7 +37,25 @@ public:
             parent_node->left = node;
         }
     }
-    
+
+    Block::BlockId Next()
+    {
+        if(_current == nullptr)
+        {
+            _current = _root;
+        }
+
+        // TODO: leftに行く条件を追加して分岐に対応
+        _current = _current->right;
+
+        if(_current == nullptr)
+        {
+            return Block::None;
+        }
+
+        return _current->Id;
+    }
+
 private:
     Node* find(Node* node, uint8_t id_h, uint8_t id_l)
     {
@@ -79,4 +97,5 @@ private:
 
 private:
     Node* _root;
+    Node* _current;
 };
