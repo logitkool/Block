@@ -8,6 +8,7 @@
 #include "block.hpp"
 #include "commands.hpp"
 #include "comm.hpp"
+#include "graph.hpp"
 
 // ふろっくコアブロック
 // for ESP32
@@ -21,7 +22,7 @@ const unsigned int INTERVAL = 1500; // ms
 
 BlockComm comm(BAUDRATE, 2);
 
-const Block::BlockId BLOCK_ID = { 0x81, 0x00, 0x01 };
+const Block::BlockId CORE_ID = { Node::CoreId, 0x00, 0x01 };
 Block::BlockId ids [MAX_BLOCK];
 int _index = 0;
 bool isScanning = false;
@@ -46,7 +47,7 @@ String processor(const String& var)
   if(var == "ID")
   {
       char buf[8];
-      sprintf(buf, "%02X%02X%02X", BLOCK_ID.TypeId, BLOCK_ID.Uid_H, BLOCK_ID.Uid_L);
+      sprintf(buf, "%02X%02X%02X", CORE_ID.TypeId, CORE_ID.Uid_H, CORE_ID.Uid_L);
       return String(buf);
   }
   return String();
@@ -155,7 +156,7 @@ void onEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType 
             ws.text(id, "scan start");
         } else if (msgs[0] == "ask")
         {
-            comm.sendToBlock(COM_ASK, BLOCK_ID.Uid_H, BLOCK_ID.Uid_L);
+            comm.sendToBlock(COM_ASK, CORE_ID.Uid_H, CORE_ID.Uid_L);
             Serial.println("wrote : COM_ASK");
 
             ws.text(id, "ok");
@@ -289,7 +290,7 @@ void loop()
     }
     if (isScanning && !askSent)
     {
-        comm.sendToBlock(COM_ASK, BLOCK_ID.Uid_H, BLOCK_ID.Uid_L);
+        comm.sendToBlock(COM_ASK, CORE_ID.Uid_H, CORE_ID.Uid_L);
         Serial.println("wrote : COM_ASK");
         askSent = true;
         askCount++;
@@ -393,7 +394,7 @@ void loop()
 
         case 'w':
             {
-                comm.sendToBlock(COM_ASK, BLOCK_ID.Uid_H, BLOCK_ID.Uid_L);
+                comm.sendToBlock(COM_ASK, CORE_ID.Uid_H, CORE_ID.Uid_L);
                 Serial.println("wrote : COM_ASK");
             }
             break;

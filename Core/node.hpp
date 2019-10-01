@@ -5,6 +5,6 @@ struct Node
 {
     Block::BlockId Id;
 
-    Node* left;
-    Node* right;
+    Node* left = nullptr;
+    Node* right = nullptr;
 };
