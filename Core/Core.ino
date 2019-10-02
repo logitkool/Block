@@ -22,6 +22,8 @@ const unsigned int INTERVAL = 500; // ms
 
 BlockComm comm(BAUDRATE, 2);
 
+PiccoRoboIoT picco();
+
 const Block::BlockId CORE_ID = { Block::Role::PureCore, 0x00, 0x01 };
 Graph graph = Graph(CORE_ID);
 bool isScanning = false;
@@ -183,11 +185,9 @@ void onEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType 
 
 void next()
 {
-    Block::BlockId dest_id = ids[_index];
-
-    comm.sendToBlock(COM_TXD, dest_id.Uid_H, dest_id.Uid_L, DAT_LED, 0x01);
-
-    _index++;
+    Block::BlockId block = graph.Next(picco);
+    // ledを光らせる
+    // ピッコに
 }
 
 void onReceived(const uint8_t* data, uint8_t size);
