@@ -5,22 +5,24 @@
 #include "comm.hpp"
 #include "config.hpp"
 
-// ふろっく 動作ブロック
+// ふろっく 分岐/繰り返しブロック
 // for ATtiny85
 
 // 設定
 const unsigned long BAUDRATE = 19200;
 const int Rx_PIN = 3; // 共通Rx
-const int Tx_CON_PIN = 1; // 接続方向Tx
+const int Tx_TRUE_PIN = 1; // 接続方向Tx (真, True)
+const int Tx_FALSE_PIN = 4; // 接続方向Tx (偽, False)
 const int Tx_BRD_PIN = 2; // 接続方向以外のTx (BRD : BRoaDcast)
 const int LED_PIN = 0;
 
 bool idSent = false;
 bool isTerminal = true; // 終端ブロックかどうか
+bool conSideIsTrue = true; // 探索(接続)方向がTrue方向かどうか
 const int MAX_ID = 4;
 Block::BlockId known_ids[MAX_ID];
 
-BlockComm comm(BAUDRATE, Rx_PIN, Tx_BRD_PIN, Tx_CON_PIN);
+BlockComm comm(BAUDRATE, Rx_PIN, Tx_BRD_PIN, Tx_TRUE_PIN, Tx_FALSE_PIN);
 Config::Config config;
 
 namespace impl_led
@@ -63,6 +65,7 @@ void onReceived(const uint8_t* data, uint8_t size)
     {
     case COM_ASK:
         if (config.getMode() != Config::Mode::PRODUCTION && config.getMode() != Config::Mode::DEBUG) break;
+        if (size < 3) break;
         {
             unsigned int idx = 0;
             while(idx < MAX_ID && known_ids[idx].Uid_H != 0xFF && known_ids[idx].Uid_H != 0xFF) idx++;
@@ -80,7 +83,13 @@ void onReceived(const uint8_t* data, uint8_t size)
             if (isKnown)
             {
                 if (comm.getPrevCommand() == COM_ASK) break;
-                comm.sendToConPort(COM_ASK, config.getId().Uid_H, config.getId().Uid_L);
+                if (conSideIsTrue)
+                {
+                    comm.sendToTruePort(COM_ASK, config.getId().Uid_H, config.getId().Uid_L);
+                } else
+                {
+                    comm.sendToFalsePort(COM_ASK, config.getId().Uid_H, config.getId().Uid_L);
+                }
             } else
             {
                 known_ids[idx] = {0xFF, data[1], data[2]};
@@ -102,6 +111,22 @@ void onReceived(const uint8_t* data, uint8_t size)
             isTerminal = false;
             if(comm.getPrevCommand() == COM_RET) break;
             comm.writeToBrdPort(data, size);
+        }
+        break;
+    
+    case COM_SWC:
+        if (config.getMode() != Config::Mode::PRODUCTION && config.getMode() != Config::Mode::DEBUG) break;
+        if (size > 4) break;
+        {
+            if (!idSent) break;
+            if (config.getId().Uid_H == data[1] && config.getId().Uid_L == data[2])
+            {
+                conSideIsTrue = (data[3] == 0x01);
+            } else
+            {
+                comm.writeToTruePort(data, size);
+                comm.writeToFalsePort(data, size);
+            }
         }
         break;
     
@@ -144,8 +169,7 @@ void onReceived(const uint8_t* data, uint8_t size)
         if (config.getMode() != Config::Mode::PRODUCTION && config.getMode() != Config::Mode::DEBUG) break;
         {
             if (!idSent) break;
-            // TODO: COM_TXDがこのままだと2回以上伝搬させられないが、ループ問題がある
-            if (comm.getPrevCommand() == COM_TXD) break;
+            if (size < 5) break;
             if (data[1] == config.getId().Uid_H && data[2] == config.getId().Uid_L)
             {
                 switch (data[3])
@@ -159,7 +183,8 @@ void onReceived(const uint8_t* data, uint8_t size)
                 }
             } else
             {
-                comm.writeToConPort(data, size);
+                comm.writeToTruePort(data, size);
+                comm.writeToFalsePort(data, size);
             }
         }
         break;
@@ -180,7 +205,8 @@ void onReceived(const uint8_t* data, uint8_t size)
 
             for(int i = 0; i < 3; i++)
             {
-                comm.sendToConPort(COM_RST);
+                comm.sendToTruePort(COM_RST);
+                comm.sendToFalsePort(COM_RST);
             }
 
         }
