@@ -3,7 +3,7 @@
 
 struct Node
 {
-    Block::BlockId Id;
+    Block::BlockId id;
 
     Node* left = nullptr;
     Node* right = nullptr;

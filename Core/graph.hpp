@@ -12,7 +12,7 @@ public:
     Graph(Block::BlockId core)
     {
         _root = new Node();
-        _root->Id = core;
+        _root->id = core;
         _current = _root;
     }
     
@@ -25,7 +25,7 @@ public:
     void Insert(Edge edge)
     {
         Node* node = new Node();
-        node->Id = edge.self;
+        node->id = edge.self;
 
         Block::BlockId const& p = edge.parent;
         Node* parent_node = find(_root, p.Uid_H, p.Uid_L);
@@ -59,22 +59,22 @@ public:
                     _current = for_start.top()->right;
                 }
 
-                return _current->Id;
+                return _current->id;
             }
             else return Block::None;
         }
 
         auto is_same_type
             = [&](Block::Type type, Block::Role role) { return Block::IsSameType(type, role); };
-        if(is_same_type(Block::Type::For, _current->Id.RoleId))
+        if(is_same_type(Block::Type::For, _current->id.RoleId))
         {
             for_start.push(_current);
 
-            int limit = static_cast<uint8_t>(_current->Id.RoleId) & 0x0F;
+            int limit = static_cast<uint8_t>(_current->id.RoleId) & 0x0F;
             for_counter.push(Counter(0, limit));
             _current = _current->right;
 
-            return _current->Id;
+            return _current->id;
         }
         else if(is_same_type(Block::Type::If, _current->id.RoleId))
         {
@@ -94,7 +94,7 @@ public:
             if(flag) _current = _current->right;
             else _current = _current->left;
 
-            return _current;
+            return _current->id;
         }
 
         _current = _current->right;
@@ -105,7 +105,7 @@ public:
             return Block::None;
         }
 
-        return _current->Id;
+        return _current->id;
     }
 
 private:
@@ -113,8 +113,8 @@ private:
     {
         if(node == nullptr) return nullptr;
 
-        if(node->Id.Uid_H == id_h
-        && node->Id.Uid_L == id_l)
+        if(node->id.Uid_H == id_h
+        && node->id.Uid_L == id_l)
         {
             return node;
         }
