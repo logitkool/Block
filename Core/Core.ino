@@ -187,8 +187,11 @@ void next()
 {
     Block::BlockId block = graph.Next(picco);
 
+    // LEDを光らせる
     comm.sendToBlock(COM_TXD, block.Uid_H, block.Uid_L, DAT_LED, 0x01);
-    // ledを光らせる
+    
+    // ピッコロボに行動させる
+    picco.Action(block.RoleType);
 }
 
 void onReceived(const uint8_t* data, uint8_t size);
