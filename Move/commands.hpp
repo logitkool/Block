@@ -9,6 +9,7 @@ const uint8_t COM_SET = 0x91;
 // 0xA- : block scan
 const uint8_t COM_ASK = 0xA0;
 const uint8_t COM_RET = 0xA1;
+const uint8_t COM_SWC = 0xA2;
 
 // 0xD- : data transfer
 const uint8_t COM_DAT = 0xD0;

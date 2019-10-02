@@ -71,7 +71,7 @@ void onReceived(const uint8_t* data, uint8_t size)
             bool isKnown = false;
             for(unsigned int i = 0; i < idx; i++)
             {
-                if (known_ids[i].Uid_H == data[1] && known_ids[i].Uid_L == data[2])
+                if (known_ids[i].Uid_H == data[2] && known_ids[i].Uid_L == data[3])
                 {
                     isKnown = true;
                 }
@@ -79,13 +79,13 @@ void onReceived(const uint8_t* data, uint8_t size)
 
             if (isKnown)
             {
-                if (comm.getPrevCommand() == COM_ASK) break;
-                comm.sendToConPort(COM_ASK, config.getId().Uid_H, config.getId().Uid_L);
+                if (comm.IsSentPrevious(data, size)) break;
+                comm.sendToConPort(COM_ASK, config.getId().TypeId, config.getId().Uid_H, config.getId().Uid_L);
             } else
             {
-                known_ids[idx] = {0xFF, data[1], data[2]};
+                known_ids[idx] = {data[1], data[2], data[3]};
                 comm.sendToAllPorts(COM_RET,
-                    data[1], data[2],
+                    data[1], data[2], data[3],
                     config.getId().TypeId, config.getId().Uid_H, config.getId().Uid_L);
                 
             }
@@ -100,7 +100,16 @@ void onReceived(const uint8_t* data, uint8_t size)
         {
             if (!idSent) break;
             isTerminal = false;
-            if(comm.getPrevCommand() == COM_RET) break;
+            if (comm.IsSentPrevious(data, size)) break;
+            comm.writeToBrdPort(data, size);
+        }
+        break;
+
+    case COM_SWC:
+        if (config.getMode() != Config::Mode::PRODUCTION && config.getMode() != Config::Mode::DEBUG) break;
+        {
+            if (!idSent) break;
+            if (comm.IsSentPrevious(data, size)) break;
             comm.writeToBrdPort(data, size);
         }
         break;
@@ -144,8 +153,7 @@ void onReceived(const uint8_t* data, uint8_t size)
         if (config.getMode() != Config::Mode::PRODUCTION && config.getMode() != Config::Mode::DEBUG) break;
         {
             if (!idSent) break;
-            // TODO: COM_TXDがこのままだと2回以上伝搬させられないが、ループ問題がある
-            if (comm.getPrevCommand() == COM_TXD) break;
+            if (comm.IsSentPrevious(data, size)) break;
             if (data[1] == config.getId().Uid_H && data[2] == config.getId().Uid_L)
             {
                 switch (data[3])
@@ -167,11 +175,11 @@ void onReceived(const uint8_t* data, uint8_t size)
     case COM_RST:
         if (config.getMode() != Config::Mode::PRODUCTION && config.getMode() != Config::Mode::DEBUG) break;
         {
-            if (comm.getPrevCommand() == COM_RST) break;
+            if (comm.IsSentPrevious(data, size)) break;
 
             idSent = false;
             isTerminal = true;
-            comm.resetPrevCommand();
+            comm.resetPrevCommands();
             
             for(unsigned int i = 0; i < MAX_ID; i++)
             {

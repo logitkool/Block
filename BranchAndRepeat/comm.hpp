@@ -41,6 +41,7 @@ public:
     // setup()内で呼び出すこと
     void init()
     {
+        resetPrevCommands();
         comBrd->begin(BAUDRATE);
     }
 
@@ -72,7 +73,12 @@ public:
         comBrd->write(packer.data(), packer.size());
         comBrd->flush();
 
-        prev_command = hex;
+        int i = 0;
+        for(i = 0; i < packer.size(); i++)
+        {
+            prev_commands[i] = packer.data()[i];
+        }
+        prev_commands[i] = 0xFF;
     }
 
     // 配列で与えられたデータをブロードキャストポートに送信します。
@@ -96,7 +102,12 @@ public:
         comTrue->end();
         comBrd->begin(BAUDRATE);
 
-        prev_command = hex;
+        int i = 0;
+        for(i = 0; i < packer.size(); i++)
+        {
+            prev_commands[i] = packer.data()[i];
+        }
+        prev_commands[i] = 0xFF;
     }
 
     // 引数で与えられたデータを接続方向ポートに送信します。
@@ -141,7 +152,12 @@ public:
         comFalse->end();
         comBrd->begin(BAUDRATE);
 
-        prev_command = hex;
+        int i = 0;
+        for(i = 0; i < packer.size(); i++)
+        {
+            prev_commands[i] = packer.data()[i];
+        }
+        prev_commands[i] = 0xFF;
     }
 
     // 配列で与えられたデータを偽側(繰り返し終了側)ポートに送信します。
@@ -182,15 +198,26 @@ public:
     }
 
     // 直前に送信したコマンドの情報をリセットします。
-    void resetPrevCommand()
+    void resetPrevCommands()
     {
-        prev_command = 0xFF;
+        for(int i = 0; i < MAX_COM_LEN; i++)
+        {
+            prev_commands[i] = 0xFF;
+        }
     }
     
-    // 直前に送信したコマンドを返します。
-    uint8_t getPrevCommand()
+    // dataが直前に送信されているか
+    uint8_t IsSentPrevious(const uint8_t* data, uint8_t size)
     {
-        return prev_command;
+        for(int i = 0; i < Min(size, MAX_COM_LEN); i++)
+        {
+            if (prev_commands[i] == 0xFF || data[i] != prev_commands[i])
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
 private:
@@ -200,8 +227,10 @@ private:
 
     bool useTwoPorts;
 
+    const unsigned int MAX_COM_LEN = 16;
+    uint8_t prev_commands[MAX_COM_LEN];
+
     const unsigned long BAUDRATE;
-    uint8_t prev_command = 0xFF;
     Packetizer::Unpacker_<2, 16> unpacker;
     Packetizer::Packer_<16> packer;
 
@@ -217,7 +246,12 @@ private:
         com->write(packer.data(), packer.size());
         com->flush();
 
-        prev_command = data[0];
+        int idx = 0;
+        for(idx = 0; idx < packer.size(); idx++)
+        {
+            prev_commands[idx] = packer.data()[idx];
+        }
+        prev_commands[idx] = 0xFF;
     }
 
     template<typename ...Param>
