@@ -23,8 +23,7 @@ const unsigned int INTERVAL = 500; // ms
 BlockComm comm(BAUDRATE, 2);
 
 const Block::BlockId CORE_ID = { Block::Role::PureCore, 0x00, 0x01 };
-Block::BlockId ids [MAX_BLOCK];
-int _index = 0;
+Graph graph = Graph(CORE_ID);
 bool isScanning = false;
 bool askSent = false;
 int askCount = 0;
@@ -101,6 +100,7 @@ void onEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType 
             DynamicJsonDocument doc(1024);
             JsonArray arrIds = doc.createNestedArray("ids");
 
+            /*
             for(unsigned int i = 0; i < MAX_BLOCK; i++)
             {
                 if (ids[i].RoleId != Block::Role::None)
@@ -110,6 +110,7 @@ void onEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType 
                     block["uid"] = String(((long)(ids[i].Uid_H) << 8) + ids[i].Uid_L, HEX);
                 }
             }
+            */
 
             char buffer[2048];
             serializeJsonPretty(doc, buffer);
@@ -140,10 +141,7 @@ void onEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType 
         } else if (msgs[0] == "reset")
         {
             Serial.println("Resetting...");
-            for(unsigned int i = 0; i < MAX_BLOCK; i++)
-            {
-                ids[i] = Block::None;
-            }
+            graph = Graph(CORE_ID);
             isScanning = false;
             askCount = 0;
             askSent = false;
@@ -259,10 +257,7 @@ void setup()
 
     // Block
     comm.init();
-    for(unsigned int i = 0; i < MAX_BLOCK; i++)
-    {
-        ids[i] = Block::None;
-    }
+    graph = Graph(CORE_ID);
     comm.subscribe(onReceived);
 
     Serial.println("initialized.");
@@ -284,12 +279,11 @@ void onReceived(const uint8_t* data, uint8_t size)
     {
     case COM_RET:
         {
-            int i = 0;
-            while(static_cast<uint8_t>(ids[i].RoleId) != 0xFF) i++;
-            if (i >= MAX_BLOCK) break;
-            ids[i].RoleId = static_cast<Block::Role>(data[4]);
-            ids[i].Uid_H = data[5];
-            ids[i].Uid_L = data[6];
+            Block::BlockId parent = Block::BlockId(data[1], data[2], data[3]);
+            Block::BlockId self = Block::BlockId(data[4], data[5], data[6]);
+            
+            graph.Insert(Edge(parent, self));
+            
             askSent = false;
             askCount = 0;
         }
@@ -364,32 +358,29 @@ void loop()
         }
         break;
 
-        case 'p':
-            {
-                for(unsigned int i = 0; i < MAX_BLOCK; i++)
-                {
-                    if (static_cast<uint8_t>(ids[i].RoleId) != 0xFF)
-                    {
-                        Serial.print("[tid=");
-                        Serial.print(String(static_cast<uint8_t>(ids[i].RoleId), HEX));
-                        Serial.print(", uid=");
-                        Serial.print(String(ids[i].Uid_H, HEX));
-                        Serial.print(String(ids[i].Uid_L, HEX));
-                        Serial.print("] -> ");
-                    }
-                }
-                Serial.println("");
-                Serial.println("completed.");
-            }
-            break;
+        // case 'p':
+        //     {
+        //         for(unsigned int i = 0; i < MAX_BLOCK; i++)
+        //         {
+        //             if (static_cast<uint8_t>(ids[i].RoleId) != 0xFF)
+        //             {
+        //                 Serial.print("[tid=");
+        //                 Serial.print(String(static_cast<uint8_t>(ids[i].RoleId), HEX));
+        //                 Serial.print(", uid=");
+        //                 Serial.print(String(ids[i].Uid_H, HEX));
+        //                 Serial.print(String(ids[i].Uid_L, HEX));
+        //                 Serial.print("] -> ");
+        //             }
+        //         }
+        //         Serial.println("");
+        //         Serial.println("completed.");
+        //     }
+        //     break;
 
         case 'r':
             {
                 Serial.println("Resetting...");
-                for(unsigned int i = 0; i < MAX_BLOCK; i++)
-                {
-                    ids[i] = Block::None;
-                }
+                graph = Graph(CORE_ID);
                 isScanning = false;
                 askCount = 0;
                 askSent = false;

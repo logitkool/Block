@@ -55,6 +55,9 @@ namespace Block
         // Uid: 2byte (Max: 0xFFFF)
         uint8_t Uid_H;
         uint8_t Uid_L;
+
+        BlockId(Role role, uint8_t id_h, uint8_t id_l)
+            : RoleId(role), Uid_H(id_h), Uid_L(id_l) {}
     };
     
     const BlockId None = { Role::None, 0xFF, 0xFF };
