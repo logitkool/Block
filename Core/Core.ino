@@ -22,7 +22,7 @@ const unsigned int INTERVAL = 1500; // ms
 
 BlockComm comm(BAUDRATE, 2);
 
-const Block::BlockId CORE_ID = { Node::CoreId, 0x00, 0x01 };
+const Block::BlockId CORE_ID = { Block::Role::PureCore, 0x00, 0x01 };
 Block::BlockId ids [MAX_BLOCK];
 int _index = 0;
 bool isScanning = false;
@@ -47,7 +47,7 @@ String processor(const String& var)
   if(var == "ID")
   {
       char buf[8];
-      sprintf(buf, "%02X%02X%02X", CORE_ID.TypeId, CORE_ID.Uid_H, CORE_ID.Uid_L);
+      sprintf(buf, "%02X%02X%02X", CORE_ID.RoleId, CORE_ID.Uid_H, CORE_ID.Uid_L);
       return String(buf);
   }
   return String();
@@ -98,10 +98,10 @@ void onEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType 
 
             for(unsigned int i = 0; i < MAX_BLOCK; i++)
             {
-                if (ids[i].TypeId != 0xFF)
+                if (ids[i].RoleId != Block::Role::None)
                 {
                     JsonObject block = arrIds.createNestedObject();
-                    block["type"] = String(ids[i].TypeId, HEX);
+                    block["type"] = String(static_cast<uint8_t>(ids[i].RoleId), HEX);
                     block["uid"] = String(((long)(ids[i].Uid_H) << 8) + ids[i].Uid_L, HEX);
                 }
             }
@@ -261,9 +261,9 @@ void onReceived(const uint8_t* data, uint8_t size)
     case COM_RET:
         {
             int i = 0;
-            while(ids[i].TypeId != 0xFF) i++;
+            while(ids[i].RoleId != 0xFF) i++;
             if (i >= MAX_BLOCK) break;
-            ids[i].TypeId = data[3];
+            ids[i].RoleId = data[3];
             ids[i].Uid_H = data[4];
             ids[i].Uid_L = data[5];
             askSent = false;
@@ -343,10 +343,10 @@ void loop()
             {
                 for(unsigned int i = 0; i < MAX_BLOCK; i++)
                 {
-                    if (ids[i].TypeId != 0xFF)
+                    if (ids[i].RoleId != 0xFF)
                     {
                         Serial.print("[tid=");
-                        Serial.print(String(ids[i].TypeId, HEX));
+                        Serial.print(String(ids[i].RoleId, HEX));
                         Serial.print(", uid=");
                         Serial.print(String(ids[i].Uid_H, HEX));
                         Serial.print(String(ids[i].Uid_L, HEX));

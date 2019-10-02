@@ -2,7 +2,8 @@
 #include "node.hpp"
 #include "edge.hpp"
 #include "block.hpp"
-#include <vector>
+#include "counter.hpp"
+#include <stack>
 
 class Graph
 {
@@ -11,6 +12,7 @@ public:
     {
         _root = new Node();
         _root->Id = core;
+        _current = _root;
     }
     
     ~Graph()
@@ -42,12 +44,45 @@ public:
     {
         if(_current == nullptr)
         {
-            _current = _root;
+            if(!for_start.empty())
+            {
+                if(for_counter.top().IsLimit())
+                {
+                    _current = for_start.top()->left;
+                    for_start.pop();
+                    for_counter.pop();
+                }
+                else
+                {
+                    for_counter.top().CountUp();
+                    _current = for_start.top()->right;
+                }
+
+                return _current->Id;
+            }
+            else return Block::None;
         }
 
         // TODO: leftに行く条件を追加して分岐に対応
+        auto is_for 
+            = [&](Block::Role role) { return Block::IsSameType(Block::Type::For, role); };
+        if(is_for(_current->Id.RoleId))
+        {
+            while(is_for(_current->Id.RoleId))
+            {
+                for_start.push(_current);
+
+                int limit = static_cast<uint8_t>(_current->Id.RoleId) & 0x0F;
+                for_counter.push(Counter(0, limit));
+                _current = _current->right;
+            }
+
+            return _current->Id;
+        }
+
         _current = _current->right;
 
+        // 何もつながっていない場合
         if(_current == nullptr)
         {
             return Block::None;
@@ -98,4 +133,6 @@ private:
 private:
     Node* _root;
     Node* _current;
+    std::stack<Node*> for_start;
+    std::stack<Counter> for_counter;
 };
