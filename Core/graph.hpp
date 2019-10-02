@@ -3,6 +3,7 @@
 #include "edge.hpp"
 #include "block.hpp"
 #include "counter.hpp"
+#include "picco.hpp"
 #include <stack>
 
 class Graph
@@ -40,7 +41,7 @@ public:
         }
     }
 
-    Block::BlockId Next()
+    Block::BlockId Next(PiccoRoboIoT& picco)
     {
         if(_current == nullptr)
         {
@@ -63,21 +64,37 @@ public:
             else return Block::None;
         }
 
-        // TODO: leftに行く条件を追加して分岐に対応
-        auto is_for 
-            = [&](Block::Role role) { return Block::IsSameType(Block::Type::For, role); };
-        if(is_for(_current->Id.RoleId))
+        auto is_same_type
+            = [&](Block::Type type, Block::Role role) { return Block::IsSameType(type, role); };
+        if(is_same_type(Block::Type::For, _current->Id.RoleId))
         {
-            while(is_for(_current->Id.RoleId))
-            {
-                for_start.push(_current);
+            for_start.push(_current);
 
-                int limit = static_cast<uint8_t>(_current->Id.RoleId) & 0x0F;
-                for_counter.push(Counter(0, limit));
-                _current = _current->right;
-            }
+            int limit = static_cast<uint8_t>(_current->Id.RoleId) & 0x0F;
+            for_counter.push(Counter(0, limit));
+            _current = _current->right;
 
             return _current->Id;
+        }
+        else if(is_same_type(Block::Type::If, _current->id.RoleId))
+        {
+            bool flag = false;
+            switch(_current->id.RoleId)
+            {
+            case Block::Role::IfBrightness:
+                flag = picco.IsBright();
+                break;
+            case Block::Role::IfObject:
+                flag = picco.HasDetectedObject();
+                break;
+            default:
+                break;
+            }
+
+            if(flag) _current = _current->right;
+            else _current = _current->left;
+
+            return _current;
         }
 
         _current = _current->right;
