@@ -68,8 +68,6 @@ void onReceived(const uint8_t* data, uint8_t size)
             while(idx < MAX_ID && known_ids[idx].Uid_H != 0xFF && known_ids[idx].Uid_H != 0xFF) idx++;
             if (idx == MAX_ID) break;
 
-            known_ids[idx] = {0xFF, data[1], data[2]};
-
             bool isKnown = false;
             for(unsigned int i = 0; i < idx; i++)
             {
@@ -85,6 +83,7 @@ void onReceived(const uint8_t* data, uint8_t size)
                 comm.sendToConPort(COM_ASK, config.getId().Uid_H, config.getId().Uid_L);
             } else
             {
+                known_ids[idx] = {0xFF, data[1], data[2]};
                 comm.sendToAllPorts(COM_RET,
                     data[1], data[2],
                     config.getId().TypeId, config.getId().Uid_H, config.getId().Uid_L);
@@ -145,6 +144,7 @@ void onReceived(const uint8_t* data, uint8_t size)
         if (config.getMode() != Config::Mode::PRODUCTION && config.getMode() != Config::Mode::DEBUG) break;
         {
             if (!idSent) break;
+            // TODO: COM_TXDがこのままだと2回以上伝搬させられないが、ループ問題がある
             if (comm.getPrevCommand() == COM_TXD) break;
             if (data[1] == config.getId().Uid_H && data[2] == config.getId().Uid_L)
             {
