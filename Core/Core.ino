@@ -18,7 +18,7 @@ const unsigned long BAUDRATE = 19200;
 const unsigned int MAX_BLOCK = 32;
 const unsigned int TIMEOUT = 500; // ms
 const unsigned int RESENT_COUNT = 3;
-const unsigned int INTERVAL = 1500; // ms
+const unsigned int INTERVAL = 500; // ms
 
 BlockComm comm(BAUDRATE, 2);
 
@@ -32,8 +32,13 @@ int lastSent = 0;
 
 // Wi-Fi
 const char* hostname = "floc_core_810001";
-const char* ssid = "oykdnAPBansui_g";
-const char* password = "a9327362a86761a528e7696dc60bfab7ce81cd0285f46f8c34d8150fdbb17cd7"; // PSK
+// const char* ssid = "oykdnAPBansui_g";
+// const char* password = "a9327362a86761a528e7696dc60bfab7ce81cd0285f46f8c34d8150fdbb17cd7"; // PSK
+// const char* ssid = "floc_wifi";
+// const char* password = "223dcaa88bd4985891ab332b26a9eb5f297ba0b2ba76d62442d104b374deb533"; // PSK
+const char password[] = "nitscproclub";
+const IPAddress ip(192, 168, 0, 1);
+const IPAddress subnet(255, 255, 255, 0);
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
@@ -160,6 +165,17 @@ void onEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType 
             Serial.println("wrote : COM_ASK");
 
             ws.text(id, "ok");
+        } else if (msgs[0] == "setled")
+        {
+            if (idx + 1 < 4) return;
+            uint8_t uid_h = strtol(msgs[1].c_str(), 0, 16);
+            uint8_t uid_l = strtol(msgs[2].c_str(), 0, 16);
+            uint8_t led = strtol(msgs[3].c_str(), 0, 16);
+
+            comm.sendToBlock(COM_TXD, uid_h, uid_l, DAT_LED, led);
+            Serial.println("wrote : COM_TXD");
+
+            ws.text(id, "ok");
         } else
         {
             ws.text(id, "message doesn't match any command pattern.");
@@ -187,21 +203,29 @@ void setup()
 
     // Wi-Fi
     Serial.println();
-    Serial.print("Connecting to ");
-    Serial.print(ssid);
+    // Serial.print("Connecting to ");
+    // Serial.print(ssid);
+    // WiFi.begin(ssid, password);
+    WiFi.softAP(hostname, password);
+    delay(100);
+    WiFi.softAPConfig(ip, ip, subnet);
+    IPAddress serverIP = WiFi.softAPIP();
 
-    WiFi.begin(ssid, password);
+    // while (WiFi.status() != WL_CONNECTED)
+    // {
+    //     delay(500);
+    //     Serial.print(".");
+    // }
 
-    while (WiFi.status() != WL_CONNECTED)
-    {
-        delay(500);
-        Serial.print(".");
-    }
-
+    // Serial.println("");
+    // Serial.println("WiFi connected");
+    // Serial.println("IP address: ");
+    // Serial.println(WiFi.localIP());
     Serial.println("");
-    Serial.println("WiFi connected");
-    Serial.println("IP address: ");
-    Serial.println(WiFi.localIP());
+    Serial.print("[AP] ssid:");
+    Serial.println(hostname);
+    Serial.print("IP:");
+    Serial.println(serverIP);
 
     if (!MDNS.begin(hostname))
     {
@@ -291,6 +315,7 @@ void loop()
     if (isScanning && !askSent)
     {
         comm.sendToBlock(COM_ASK, CORE_ID.Uid_H, CORE_ID.Uid_L);
+        delay(50);
         Serial.println("wrote : COM_ASK");
         askSent = true;
         askCount++;

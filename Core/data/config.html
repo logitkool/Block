@@ -39,20 +39,40 @@
 
             <hr />
 
+            <h2>LED</h2>
+
+            <div class="form-row">
+                <div class="col-auto">
+                    <label for="led_uid_h">UID_H</label>
+                    <input type="text" class="form-control mb-2" id="led_uid_h" placeholder="00">
+                </div>
+                <div class="col-auto">
+                    <label for="led_uid_l">UID_L</label>
+                    <input type="text" class="form-control mb-2" id="led_uid_l" placeholder="01">
+                </div>
+                <div class="col-auto">
+                    <label for="led_value">LED Value(00/01)</label>
+                    <input type="text" class="form-control mb-2" id="led_value" placeholder="01">
+                </div>
+            </div>
+            <button class="btn btn-warning" type="button" onclick="setled();">Set LED</button>
+
+            <hr />
+
             <h2>Set ID</h2>
 
             <div class="form-row">
                 <div class="col-auto">
                     <label for="set_tid">TYPE_ID</label>
-                    <input type="text" class="form-control mb-2" id="set_tid" placeholder="0x81">
+                    <input type="text" class="form-control mb-2" id="set_tid" placeholder="81">
                 </div>
                 <div class="col-auto">
                     <label for="set_uid_h">UID_H</label>
-                    <input type="text" class="form-control mb-2" id="set_uid_h" placeholder="0x00">
+                    <input type="text" class="form-control mb-2" id="set_uid_h" placeholder="00">
                 </div>
                 <div class="col-auto">
                     <label for="set_uid_l">UID_L</label>
-                    <input type="text" class="form-control mb-2" id="set_uid_l" placeholder="0x01">
+                    <input type="text" class="form-control mb-2" id="set_uid_l" placeholder="01">
                 </div>
             </div>
             <button class="btn btn-warning" type="button" onclick="setid();">Set ID</button>
@@ -63,7 +83,7 @@
             <div class="form-row">
                 <div class="col-auto">
                     <label for="mode_id">Mode ID</label>
-                    <input type="text" class="form-control mb-2" id="mode_id" placeholder="0x01">
+                    <input type="text" class="form-control mb-2" id="mode_id" placeholder="01">
                 </div>
             </div>
             <button class="btn btn-primary" type="button" onclick="setmode();">Set Mode</button>

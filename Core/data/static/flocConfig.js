@@ -8,7 +8,7 @@ $(function()
 
 function setid()
 {
-    if (!$('#set_tid').val() || !$('#set_tid').val() || !$('#set_tid').val())
+    if (!$('#set_tid').val() || !$('#set_uid_h').val() || !$('#set_uid_l').val())
     {
         alert("未記入のIDがあります。");
         return;
@@ -38,6 +38,48 @@ function setid()
     } else
     {
         alert("記入されたIDの中に不適切なものがあります。");
+        return;
+    }
+
+}
+
+function setled()
+{
+    if (!$('#led_uid_h').val() || !$('#led_uid_l').val())
+    {
+        alert("未記入のIDがあります。");
+        return;
+    }
+    if (!$('#led_value').val())
+    {
+        alert("Valueが未記入です。");
+        return;
+    }
+
+    const uid_h = parseInt($('#led_uid_h').val(), 16);
+    const uid_l = parseInt($('#led_uid_l').val(), 16);
+    const value = parseInt($('#led_value').val(), 16);
+
+    const uid_h_ok = (uid_h >= 0) && (uid_h <= 255);
+    const uid_l_ok = (uid_l >= 0) && (uid_l <= 255);
+    const value_ok = (value == 0) || (value == 1);
+
+    if (uid_h_ok && uid_l_ok && value_ok)
+    {
+        console.log("setled "
+            + uid_h.toString(16).toUpperCase() + " "
+            + uid_l.toString(16).toUpperCase() + " "
+            + value.toString(16).toUpperCase()
+        );
+
+        send("setled "
+            + uid_h.toString(16).toUpperCase() + " "
+            + uid_l.toString(16).toUpperCase() + " "
+            + value.toString(16).toUpperCase()
+        );
+    } else
+    {
+        alert("記入されたIDまたはValueの中に不適切なものがあります。");
         return;
     }
 
