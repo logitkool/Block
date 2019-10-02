@@ -51,13 +51,18 @@ namespace Block
     struct BlockId
     {
         // 1byte (Max: 0xFF)
-        Role RoleId;
+        Role RoleType;
         // Uid: 2byte (Max: 0xFFFF)
         uint8_t Uid_H;
         uint8_t Uid_L;
 
+        uint8_t RoleId() const { return static_cast<uint8_t>(RoleType); }
+
         BlockId(Role role, uint8_t id_h, uint8_t id_l)
-            : RoleId(role), Uid_H(id_h), Uid_L(id_l) {}
+            : RoleType(role), Uid_H(id_h), Uid_L(id_l) {}
+
+        BlockId(uint8_t role_id, uint8_t id_h, uint8_t id_l)
+            : RoleType(static_cast<Role>(role_id)), Uid_H(id_h), Uid_L(id_l) {}
     };
     
     const BlockId None = { Role::None, 0xFF, 0xFF };

@@ -22,7 +22,7 @@ const unsigned int INTERVAL = 500; // ms
 
 BlockComm comm(BAUDRATE, 2);
 
-PiccoRoboIoT picco();
+PiccoRoboIoT picco = PiccoRoboIoT();
 
 const Block::BlockId CORE_ID = { Block::Role::PureCore, 0x00, 0x01 };
 Graph graph = Graph(CORE_ID);
@@ -53,7 +53,7 @@ String processor(const String& var)
   if(var == "ID")
   {
       char buf[8];
-      sprintf(buf, "%02X%02X%02X", static_cast<uint8_t>(CORE_ID.RoleId), CORE_ID.Uid_H, CORE_ID.Uid_L);
+      sprintf(buf, "%02X%02X%02X", CORE_ID.RoleId(), CORE_ID.Uid_H, CORE_ID.Uid_L);
       return String(buf);
   }
   return String();
@@ -161,7 +161,7 @@ void onEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType 
             ws.text(id, "scan start");
         } else if (msgs[0] == "ask")
         {
-            comm.sendToBlock(COM_ASK, static_cast<uint8_t>(CORE_ID.RoleId), CORE_ID.Uid_H, CORE_ID.Uid_L);
+            comm.sendToBlock(COM_ASK, CORE_ID.RoleId(), CORE_ID.Uid_H, CORE_ID.Uid_L);
             Serial.println("wrote : COM_ASK");
 
             ws.text(id, "ok");
@@ -186,8 +186,9 @@ void onEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType 
 void next()
 {
     Block::BlockId block = graph.Next(picco);
+
+    comm.sendToBlock(COM_TXD, block.Uid_H, block.Uid_L, DAT_LED, 0x01);
     // ledを光らせる
-    // ピッコに
 }
 
 void onReceived(const uint8_t* data, uint8_t size);
@@ -308,7 +309,7 @@ void loop()
     }
     if (isScanning && !askSent)
     {
-        comm.sendToBlock(COM_ASK, static_cast<uint8_t>(CORE_ID.RoleId), CORE_ID.Uid_H, CORE_ID.Uid_L);
+        comm.sendToBlock(COM_ASK, CORE_ID.RoleId(), CORE_ID.Uid_H, CORE_ID.Uid_L);
         delay(50);
         Serial.println("wrote : COM_ASK");
         askSent = true;
@@ -362,10 +363,10 @@ void loop()
         //     {
         //         for(unsigned int i = 0; i < MAX_BLOCK; i++)
         //         {
-        //             if (static_cast<uint8_t>(ids[i].RoleId) != 0xFF)
+        //             if (ids[i].RoleId != Block::Role::None)
         //             {
         //                 Serial.print("[tid=");
-        //                 Serial.print(String(static_cast<uint8_t>(ids[i].RoleId), HEX));
+        //                 Serial.print(String(ids[i].RoleId(), HEX));
         //                 Serial.print(", uid=");
         //                 Serial.print(String(ids[i].Uid_H, HEX));
         //                 Serial.print(String(ids[i].Uid_L, HEX));
@@ -410,7 +411,7 @@ void loop()
 
         case 'w':
             {
-                comm.sendToBlock(COM_ASK, static_cast<uint8_t>(CORE_ID.RoleId), CORE_ID.Uid_H, CORE_ID.Uid_L);
+                comm.sendToBlock(COM_ASK, CORE_ID.RoleId(), CORE_ID.Uid_H, CORE_ID.Uid_L);
                 Serial.println("wrote : COM_ASK");
             }
             break;

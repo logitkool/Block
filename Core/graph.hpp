@@ -66,20 +66,20 @@ public:
 
         auto is_same_type
             = [&](Block::Type type, Block::Role role) { return Block::IsSameType(type, role); };
-        if(is_same_type(Block::Type::For, _current->id.RoleId))
+        if(is_same_type(Block::Type::For, _current->id.RoleType))
         {
             for_start.push(_current);
 
-            int limit = static_cast<uint8_t>(_current->id.RoleId) & 0x0F;
+            int limit = static_cast<uint8_t>(_current->id.RoleType) & 0x0F;
             for_counter.push(Counter(0, limit));
             _current = _current->right;
 
             return _current->id;
         }
-        else if(is_same_type(Block::Type::If, _current->id.RoleId))
+        else if(is_same_type(Block::Type::If, _current->id.RoleType))
         {
             bool flag = false;
-            switch(_current->id.RoleId)
+            switch(_current->id.RoleType)
             {
             case Block::Role::IfBrightness:
                 flag = picco.IsBright();
