@@ -5,13 +5,15 @@
 #include "counter.hpp"
 #include "picco.hpp"
 #include <stack>
+#include <set>
+#include <ArduinoJson.h>
 
 class Graph
 {
 public:
     Graph(Block::BlockId core)
     {
-        _root = new Node();
+        _root = std::make_shared<Node>();
         _root->id = core;
         _current = _root;
     }
@@ -24,11 +26,21 @@ public:
 public:
     void Insert(Edge edge)
     {
-        Node* node = new Node();
-        node->id = edge.self;
+        std::shared_ptr<Node> node;
+        Block::BlockId const& s = edge.self;
+
+        std::shared_ptr<Node> self_node = find(_root, s.Uid_H, s.Uid_L);
+        if (self_node != nullptr)
+        {
+            node = self_node;
+        } else
+        {
+            node = std::make_shared<Node>();
+            node->id = edge.self;
+        }
 
         Block::BlockId const& p = edge.parent;
-        Node* parent_node = find(_root, p.Uid_H, p.Uid_L);
+        std::shared_ptr<Node> parent_node = find(_root, p.Uid_H, p.Uid_L);
 
         // ノードを木にぶら下げる
         if(parent_node->right == nullptr)
@@ -108,24 +120,77 @@ public:
         return _current->id;
     }
 
-private:
-    Node* find(Node* node, uint8_t id_h, uint8_t id_l)
+    String ToString()
     {
-        if(node == nullptr) return nullptr;
+        DynamicJsonDocument doc(1024);
+        JsonArray arrNodes = doc.createNestedArray("nodes");
 
+        if (_root == nullptr) return "{\"error\": \"_root is null.\"}";
+        
+        std::stack<std::shared_ptr<Node>> s;
+        s.push(_root);
+        std::shared_ptr<Node> p;
+        auto cmp_id = [](Block::BlockId lhs, Block::BlockId rhs) { return (lhs.RoleId() < rhs.RoleId() || lhs.Uid_H < rhs.Uid_H || lhs.Uid_L < rhs.Uid_L); };
+        std::set<Block::BlockId, decltype(cmp_id)> visited(cmp_id);
+        while(s.size() > 0)
+        {
+            p = s.top();
+            s.pop();
+
+            if (visited.count(p->id) > 0) continue;
+            visited.insert(p->id);
+
+            JsonObject node = arrNodes.createNestedObject();
+            node["type"] = String(p->id.RoleId(), HEX);
+            node["uid"] = String(((long)(p->id.Uid_H) << 8) + p->id.Uid_L, HEX);
+            node["left"] = p->left == nullptr ? "null" :  String(((long)(p->left->id.Uid_H) << 8) + p->left->id.Uid_L, HEX);
+            node["right"] = p->right == nullptr ? "null" :  String(((long)(p->right->id.Uid_H) << 8) + p->right->id.Uid_L, HEX);
+            
+            if (p->right != nullptr) s.push(p->right);
+            if (p->left != nullptr) s.push(p->left);
+        }
+
+        char buffer[2048];
+        serializeJsonPretty(doc, buffer);
+
+        return String(buffer);
+    }
+
+private:
+    std::shared_ptr<Node> find(std::shared_ptr<Node> node, uint8_t id_h, uint8_t id_l)
+    {
+        Serial.println(node == nullptr ? "node is null" : "node is not null");
+        if(node == nullptr)
+        {
+            Serial.print("H: ");
+            Serial.print(id_h);
+            Serial.print("L: ");
+            Serial.println(id_l);
+            return nullptr;
+        }
+        Serial.print("node->id.H: ");
+        Serial.print(node->id.Uid_H);
+        Serial.print(", node->id.L: ");
+        Serial.println(node->id.Uid_L);
+        Serial.print("H: ");
+        Serial.print(id_h);
+        Serial.print("L: ");
+        Serial.println(id_l);
+        
         if(node->id.Uid_H == id_h
         && node->id.Uid_L == id_l)
         {
+            Serial.println("match!");
             return node;
         }
 
-        Node* right = find(node->right, id_h, id_l);
+        std::shared_ptr<Node> right = find(node->right, id_h, id_l);
         if(right != nullptr)
         {
             return right;
         }
 
-        Node* left = find(node->left, id_h, id_l);
+        std::shared_ptr<Node> left = find(node->left, id_h, id_l);
         if(left != nullptr)
         {
             return left;
@@ -134,7 +199,7 @@ private:
         return nullptr;
     }
 
-    void clear_tree(Node* node)
+    void clear_tree(std::shared_ptr<Node> node)
     {
         if(node == nullptr)
         {
@@ -144,12 +209,12 @@ private:
         clear_tree(node->right);
         clear_tree(node->left);
 
-        delete node;
+        node = nullptr;
     }
 
 private:
-    Node* _root;
-    Node* _current;
-    std::stack<Node*> for_start;
+    std::shared_ptr<Node> _root;
+    std::shared_ptr<Node> _current;
+    std::stack<std::shared_ptr<Node>> for_start;
     std::stack<Counter> for_counter;
 };

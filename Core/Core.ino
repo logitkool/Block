@@ -3,7 +3,6 @@
 #include <ESPAsyncWebServer.h>
 #include <SPIFFS.h>
 #include <ESPmDNS.h>
-#include <ArduinoJson.h>
 
 #include "block.hpp"
 #include "commands.hpp"
@@ -36,11 +35,11 @@ int lastSent = 0;
 const char* hostname = "floc_core_810001";
 // const char* ssid = "oykdnAPBansui_g";
 // const char* password = "a9327362a86761a528e7696dc60bfab7ce81cd0285f46f8c34d8150fdbb17cd7"; // PSK
-// const char* ssid = "floc_wifi";
-// const char* password = "223dcaa88bd4985891ab332b26a9eb5f297ba0b2ba76d62442d104b374deb533"; // PSK
-const char password[] = "nitscproclub";
-const IPAddress ip(192, 168, 0, 1);
-const IPAddress subnet(255, 255, 255, 0);
+const char* ssid = "floc_wifi";
+const char* password = "223dcaa88bd4985891ab332b26a9eb5f297ba0b2ba76d62442d104b374deb533"; // PSK
+// const char password[] = "nitscproclub";
+// const IPAddress ip(192, 168, 0, 1);
+// const IPAddress subnet(255, 255, 255, 0);
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
@@ -100,24 +99,8 @@ void onEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType 
 
         if (msgs[0] == "ids")
         {
-            DynamicJsonDocument doc(1024);
-            JsonArray arrIds = doc.createNestedArray("ids");
-
-            /*
-            for(unsigned int i = 0; i < MAX_BLOCK; i++)
-            {
-                if (ids[i].RoleId != Block::Role::None)
-                {
-                    JsonObject block = arrIds.createNestedObject();
-                    block["type"] = String(static_cast<uint8_t>(ids[i].RoleId), HEX);
-                    block["uid"] = String(((long)(ids[i].Uid_H) << 8) + ids[i].Uid_L, HEX);
-                }
-            }
-            */
-
-            char buffer[2048];
-            serializeJsonPretty(doc, buffer);
-            ws.text(id, buffer);
+            String json = graph.ToString();
+            ws.text(id, json);
         } else if (msgs[0] == "setid")
         {
             if (idx + 1 < 4) return;
@@ -187,6 +170,7 @@ void onEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType 
 void next()
 {
     Block::BlockId block = graph.Next(picco);
+    Serial.println("next block => rid:" + String(block.RoleId(), HEX) + ", uid_h:" + String(block.Uid_H, HEX) + ", uid_l:" + String(block.Uid_L, HEX));
 
     // LEDを光らせる
     comm.sendToBlock(COM_TXD, block.Uid_H, block.Uid_L, DAT_LED, 0x01);
@@ -206,29 +190,29 @@ void setup()
 
     // Wi-Fi
     Serial.println();
-    // Serial.print("Connecting to ");
-    // Serial.print(ssid);
-    // WiFi.begin(ssid, password);
-    WiFi.softAP(hostname, password);
-    delay(100);
-    WiFi.softAPConfig(ip, ip, subnet);
-    IPAddress serverIP = WiFi.softAPIP();
+    Serial.print("Connecting to ");
+    Serial.print(ssid);
+    WiFi.begin(ssid, password);
+    // WiFi.softAP(hostname, password);
+    // delay(100);
+    // WiFi.softAPConfig(ip, ip, subnet);
+    // IPAddress serverIP = WiFi.softAPIP();
 
-    // while (WiFi.status() != WL_CONNECTED)
-    // {
-    //     delay(500);
-    //     Serial.print(".");
-    // }
+    while (WiFi.status() != WL_CONNECTED)
+    {
+        delay(500);
+        Serial.print(".");
+    }
 
-    // Serial.println("");
-    // Serial.println("WiFi connected");
-    // Serial.println("IP address: ");
-    // Serial.println(WiFi.localIP());
     Serial.println("");
-    Serial.print("[AP] ssid:");
-    Serial.println(hostname);
-    Serial.print("IP:");
-    Serial.println(serverIP);
+    Serial.println("WiFi connected");
+    Serial.println("IP address: ");
+    Serial.println(WiFi.localIP());
+    // Serial.println("");
+    // Serial.print("[AP] ssid:");
+    // Serial.println(hostname);
+    // Serial.print("IP:");
+    // Serial.println(serverIP);
 
     if (!MDNS.begin(hostname))
     {
@@ -343,23 +327,24 @@ void loop()
 
         case 'i':
         {
-            Serial.println("set id...");
-            comm.sendToBlock(COM_CFG);
-            // comm.sendToBlock(COM_SET, 0x01, 0x11);
-            comm.sendToBlock(COM_SET, 0x02, 0x11, 0x01, 0x01);
-            comm.sendToBlock(COM_SET, 0x01, 0x01);
-            comm.sendToBlock(COM_APL);
-            Serial.println("sent.");
+            // Serial.println("set id...");
+            // comm.sendToBlock(COM_CFG);
+            // // comm.sendToBlock(COM_SET, 0x01, 0x11);
+            // comm.sendToBlock(COM_SET, 0x02, 0x11, 0x01, 0x01);
+            // comm.sendToBlock(COM_SET, 0x01, 0x01);
+            // comm.sendToBlock(COM_APL);
+            // Serial.println("sent.");
+
         }
         break;
 
         case 'd':
         {
-            Serial.println("set debug mode...");
-            comm.sendToBlock(COM_CFG);
-            comm.sendToBlock(COM_SET, 0x01, 0x12);
-            comm.sendToBlock(COM_APL);
-            Serial.println("sent.");
+            // Serial.println("set debug mode...");
+            // comm.sendToBlock(COM_CFG);
+            // comm.sendToBlock(COM_SET, 0x01, 0x12);
+            // comm.sendToBlock(COM_APL);
+            // Serial.println("sent.");
         }
         break;
 
@@ -381,6 +366,18 @@ void loop()
         //         Serial.println("completed.");
         //     }
         //     break;
+        case 'p':
+            {
+                Serial.println(graph.ToString());
+            }
+            break;
+
+        case 'n':
+            {
+                Serial.println("call next...");
+                next();
+            }
+            break;
 
         case 'r':
             {
@@ -396,22 +393,22 @@ void loop()
             }
             break;
 
-        case 'l':
-            {
-                if (ledState)
-                {
-                    comm.sendToBlock(COM_TXD, 0x00, 0x01, DAT_LED, 0x00);
-                    Serial.println("wrote : COM_TXD");
-                    Serial.println("led off");
-                } else
-                {
-                    comm.sendToBlock(COM_TXD, 0x00, 0x01, DAT_LED, 0x01);
-                    Serial.println("wrote : COM_TXD");
-                    Serial.println("led on");
-                }
-                ledState = !ledState;
-            }
-            break;
+        // case 'l':
+        //     {
+        //         if (ledState)
+        //         {
+        //             comm.sendToBlock(COM_TXD, 0x00, 0x01, DAT_LED, 0x00);
+        //             Serial.println("wrote : COM_TXD");
+        //             Serial.println("led off");
+        //         } else
+        //         {
+        //             comm.sendToBlock(COM_TXD, 0x00, 0x01, DAT_LED, 0x01);
+        //             Serial.println("wrote : COM_TXD");
+        //             Serial.println("led on");
+        //         }
+        //         ledState = !ledState;
+        //     }
+        //     break;
 
         case 'w':
             {

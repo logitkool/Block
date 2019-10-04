@@ -5,6 +5,6 @@ struct Node
 {
     Block::BlockId id = Block::None;
 
-    Node* left = nullptr;
-    Node* right = nullptr;
+    std::shared_ptr<Node> left = nullptr;
+    std::shared_ptr<Node> right = nullptr;
 };
