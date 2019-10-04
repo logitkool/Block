@@ -22,7 +22,8 @@ const unsigned int INTERVAL = 500; // ms
 
 BlockComm comm(BAUDRATE, 2);
 
-PiccoRoboIoT picco = PiccoRoboIoT();
+const String PICCO_URI = "http://192.168.11.250";
+PiccoRoboIoT picco(PICCO_URI);
 
 const Block::BlockId CORE_ID = { Block::Role::PureCore, 0x00, 0x01 };
 Graph graph = Graph(CORE_ID);
