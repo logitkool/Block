@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <title>ふろっく</title>
+        <meta charset="UTF-8" />
+
+        <script type="text/javascript" src="/static/jquery.js"></script>
+        <script type="text/javascript" src="/static/popper.js"></script>
+        <link rel="stylesheet" href="/static/bootstrap.css">
+        <script type="text/javascript" src="/static/bootstrap.js"></script>
+
+        <script type="text/javascript" src="static/flocConfig.js"></script>
+    </head>
+    <body>
+        <nav class="navbar navbar-expand-sm navbar-dark bg-dark">
+            <a href="/" class="navbar-brand">ふろっく コアブロック</a>
+            <button class="navbar-toggler" type="button"
+                data-toggle="collapse"
+                data-target="#navmenu"
+                aria-controls="navmenu"
+                aria-expanded="false"
+                aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navmenu">
+                <div class="navbar-nav">
+                <a class="nav-item nav-link" href="/config">Config</a>
+                </div>
+            </div>
+        </nav>
+        
+        <div class="container" style="padding: 30px 0 0 0;">
+            
+            <h2>Scan</h2>
+            <button class="btn btn-primary" type="button" onclick="send('scan');">Start scan</button>
+            <button class="btn btn-primary" type="button" onclick="send('ask');">Send COM_ASK</button>
+            <button class="btn btn-success" type="button" onclick="send('reset');">Reset</button>
+            <button class="btn btn-info" type="button" onclick="send('ids');">Get IDs</button>
+
+            <hr />
+
+            <h2>LED</h2>
+
+            <div class="form-row">
+                <div class="col-auto">
+                    <label for="led_uid_h">UID_H</label>
+                    <input type="text" class="form-control mb-2" id="led_uid_h" placeholder="00">
+                </div>
+                <div class="col-auto">
+                    <label for="led_uid_l">UID_L</label>
+                    <input type="text" class="form-control mb-2" id="led_uid_l" placeholder="01">
+                </div>
+                <div class="col-auto">
+                    <label for="led_value">LED Value(00/01)</label>
+                    <input type="text" class="form-control mb-2" id="led_value" placeholder="01">
+                </div>
+            </div>
+            <button class="btn btn-warning" type="button" onclick="setled();">Set LED</button>
+
+            <hr />
+
+            <h2>Set ID</h2>
+
+            <div class="form-row">
+                <div class="col-auto">
+                    <label for="set_tid">TYPE_ID</label>
+                    <input type="text" class="form-control mb-2" id="set_tid" placeholder="81">
+                </div>
+                <div class="col-auto">
+                    <label for="set_uid_h">UID_H</label>
+                    <input type="text" class="form-control mb-2" id="set_uid_h" placeholder="00">
+                </div>
+                <div class="col-auto">
+                    <label for="set_uid_l">UID_L</label>
+                    <input type="text" class="form-control mb-2" id="set_uid_l" placeholder="01">
+                </div>
+            </div>
+            <button class="btn btn-warning" type="button" onclick="setid();">Set ID</button>
+
+            <hr />
+
+            <h2>Set Mode</h2>
+            <div class="form-row">
+                <div class="col-auto">
+                    <label for="mode_id">Mode ID</label>
+                    <input type="text" class="form-control mb-2" id="mode_id" placeholder="01">
+                </div>
+            </div>
+            <button class="btn btn-primary" type="button" onclick="setmode();">Set Mode</button>
+
+        </div>
+    </body>
+</html>
