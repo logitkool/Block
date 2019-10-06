@@ -17,7 +17,8 @@ const unsigned long BAUDRATE = 19200;
 const unsigned int MAX_BLOCK = 32;
 const unsigned int TIMEOUT = 500; // ms
 const unsigned int RESENT_COUNT = 3;
-const unsigned int INTERVAL = 500; // ms
+const unsigned int INTERVAL = 750; // ms
+const unsigned int BLOCK_NEXT_INTERVAL = 3000; // ms
 
 BlockComm comm(BAUDRATE, 2);
 
@@ -30,6 +31,12 @@ bool isScanning = false;
 bool askSent = false;
 int askCount = 0;
 int lastSent = 0;
+bool coreButtonPressed = false;
+int lastNext = 0;
+
+const int PIN_LED_STATE = 32;
+const int PIN_LED_ERROR = 33;
+const int PIN_BTN = 23;
 
 // Wi-Fi
 const char* hostname = "floc_core_810001";
@@ -172,6 +179,11 @@ void next()
     Block::BlockId block = graph.Next(picco);
     Serial.println("next block => rid:" + String(block.RoleId(), HEX) + ", uid_h:" + String(block.Uid_H, HEX) + ", uid_l:" + String(block.Uid_L, HEX));
 
+    if (block .RoleType == Block::Role::None)
+    {
+        coreButtonPressed = false;
+    }
+
     // LEDを光らせる
     comm.sendToBlock(COM_TXD, block.Uid_H, block.Uid_L, DAT_LED, 0x01);
     
@@ -184,6 +196,14 @@ void onReceived(const uint8_t* data, uint8_t size);
 void setup()
 {
     Serial.begin(BAUDRATE);
+
+    // PIN
+    pinMode(PIN_LED_STATE, OUTPUT);
+    pinMode(PIN_LED_ERROR, OUTPUT);
+    pinMode(PIN_BTN, INPUT_PULLUP);
+
+    digitalWrite(PIN_LED_STATE, LOW);
+    digitalWrite(PIN_LED_ERROR, LOW);
 
     // SPIFFS
     SPIFFS.begin();
@@ -250,6 +270,7 @@ void setup()
     comm.subscribe(onReceived);
 
     Serial.println("initialized.");
+    digitalWrite(PIN_LED_STATE, HIGH);
 }
 
 void onReceived(const uint8_t* data, uint8_t size)
@@ -270,7 +291,7 @@ void onReceived(const uint8_t* data, uint8_t size)
         {
             Block::BlockId parent = Block::BlockId(data[1], data[2], data[3]);
             Block::BlockId self = Block::BlockId(data[4], data[5], data[6]);
-            
+
             graph.Insert(Edge(parent, self));
             
             askSent = false;
@@ -283,18 +304,27 @@ void onReceived(const uint8_t* data, uint8_t size)
     }
 }
 
-bool ledState = false;
-
 void loop()
 {
     if (askCount > RESENT_COUNT)
     {
         if (isScanning)
         {
-        Serial.println("Scan completed.");
+            Serial.println("Scan completed.");
         }
         isScanning = false;
+        if (coreButtonPressed)
+        {
+            lastNext = millis();
+            next();
+        }
     }
+    if (!isScanning && coreButtonPressed && lastNext + BLOCK_NEXT_INTERVAL < millis())
+    {
+        lastNext = millis();
+        next();
+    }
+
     if (isScanning && !askSent)
     {
         comm.sendToBlock(COM_ASK, CORE_ID.RoleId(), CORE_ID.Uid_H, CORE_ID.Uid_L);
@@ -307,6 +337,24 @@ void loop()
     if (millis() - lastSent >= TIMEOUT)
     {
         askSent = false;
+    }
+
+    if (!coreButtonPressed && digitalRead(PIN_BTN) == LOW)
+    {
+        // pull-upなのでHIGH
+        coreButtonPressed = true;
+
+        // RESET
+        graph = Graph(CORE_ID);
+        isScanning = false;
+        askCount = 0;
+        askSent = false;
+        lastSent = 0;
+        comm.sendToBlock(COM_RST);
+
+        // SCAN
+        isScanning = true;
+
     }
 
     comm.listen();

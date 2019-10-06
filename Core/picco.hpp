@@ -90,7 +90,7 @@ private:
 
         client.begin(picco_uri + path);
         Serial.println("Start GET : " + picco_uri + path);
-        client.setTimeout(1000);
+        client.setTimeout(500);
         int code = client.GET();
 
         Serial.println("Response: " + code);
