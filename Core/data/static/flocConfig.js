@@ -85,6 +85,11 @@ function setled()
 
 }
 
+function corebtn()
+{
+    send("corebtn");
+}
+
 function setmode()
 {
     if (!$('#mode_id').val())
@@ -142,7 +147,8 @@ function onMessage(event)
 {
     if (event && event.data)
     {
-        alert(event.data);
+        // alert(event.data);
+        $('#log').prepend(event.data + "\n");
     }
 }
 

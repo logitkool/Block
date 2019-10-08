@@ -31,6 +31,10 @@
         
         <div class="container" style="padding: 30px 0 0 0;">
             
+            <h2>Core</h2>
+            <button class="btn btn-danger" type="button" onclick="send('corebtn');">PUSH</button>
+            <button class="btn btn-success" type="button" onclick="send('reset');">Reset</button>
+
             <h2>Scan</h2>
             <button class="btn btn-primary" type="button" onclick="send('scan');">Start scan</button>
             <button class="btn btn-primary" type="button" onclick="send('ask');">Send COM_ASK</button>
@@ -56,6 +60,11 @@
                 </div>
             </div>
             <button class="btn btn-warning" type="button" onclick="setled();">Set LED</button>
+
+            <hr />
+
+            <h2>Log</h2>
+            <pre><code id="log"></code></pre>
 
             <hr />
 

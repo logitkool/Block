@@ -18,7 +18,6 @@ const unsigned int MAX_BLOCK = 32;
 const unsigned int TIMEOUT = 500; // ms
 const unsigned int RESENT_COUNT = 3;
 const unsigned int INTERVAL = 750; // ms
-const unsigned int BLOCK_NEXT_INTERVAL = 3000; // ms
 
 BlockComm comm(BAUDRATE, 2);
 
@@ -32,7 +31,8 @@ bool askSent = false;
 int askCount = 0;
 int lastSent = 0;
 bool coreButtonPressed = false;
-int lastNext = 0;
+unsigned long lastNext = 0;
+bool isProcessing = false;
 
 const int PIN_LED_STATE = 32;
 const int PIN_LED_ERROR = 33;
@@ -47,6 +47,11 @@ const char* password = "223dcaa88bd4985891ab332b26a9eb5f297ba0b2ba76d62442d104b3
 // const char password[] = "nitscproclub";
 // const IPAddress ip(192, 168, 0, 1);
 // const IPAddress subnet(255, 255, 255, 0);
+IPAddress ip(192, 168, 11, 241);
+IPAddress gateway(192,168, 11, 1);
+IPAddress subnet(255, 255, 255, 0);
+IPAddress DNS(192, 168, 11, 1);
+
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
@@ -120,7 +125,7 @@ void onEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType 
             comm.sendToBlock(COM_SET, 0x01, 0x01);
             comm.sendToBlock(COM_APL);
 
-            ws.text(id, "ok");
+            ws.text(id, "[setid] ok.");
         } else if (msgs[0] == "setmode")
         {
             if (idx + 1 < 2) return;
@@ -130,20 +135,12 @@ void onEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType 
             comm.sendToBlock(COM_SET, 0x01, mode);
             comm.sendToBlock(COM_APL);
 
-            ws.text(id, "ok");
+            ws.text(id, "[setmode] ok.");
         } else if (msgs[0] == "reset")
         {
-            Serial.println("Resetting...");
-            graph = Graph(CORE_ID);
-            isScanning = false;
-            askCount = 0;
-            askSent = false;
-            lastSent = 0;
-            comm.sendToBlock(COM_RST);
-            Serial.println("wrote : COM_RST");
-            Serial.println("completed.");
+            resetBlock();
 
-            ws.text(id, "ok");
+            ws.text(id, "[reset] ok.");
         } else if (msgs[0] == "scan")
         {
             Serial.println("Scanning...");
@@ -155,7 +152,7 @@ void onEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType 
             comm.sendToBlock(COM_ASK, CORE_ID.RoleId(), CORE_ID.Uid_H, CORE_ID.Uid_L);
             Serial.println("wrote : COM_ASK");
 
-            ws.text(id, "ok");
+            ws.text(id, "[ask] ok");
         } else if (msgs[0] == "setled")
         {
             if (idx + 1 < 4) return;
@@ -166,7 +163,19 @@ void onEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType 
             comm.sendToBlock(COM_TXD, uid_h, uid_l, DAT_LED, led);
             Serial.println("wrote : COM_TXD");
 
-            ws.text(id, "ok");
+            ws.text(id, "[setled] ok");
+        } else if (msgs[0] == "next")
+        {
+            lastNext = millis();
+            next();
+            ws.text(id, "[next] ok.");
+        } else if (msgs[0] == "corebtn")
+        {
+            resetBlock();
+            coreButtonPressed = true;
+            // SCAN
+            isScanning = true;
+            debugPrintln("core button pressed.");
         } else
         {
             ws.text(id, "message doesn't match any command pattern.");
@@ -176,10 +185,12 @@ void onEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType 
 
 void next()
 {
-    Block::BlockId block = graph.Next(picco);
-    Serial.println("next block => rid:" + String(block.RoleId(), HEX) + ", uid_h:" + String(block.Uid_H, HEX) + ", uid_l:" + String(block.Uid_L, HEX));
+    isProcessing = true;
 
-    if (block .RoleType == Block::Role::None)
+    Block::BlockId block = graph.Next(picco);
+    debugPrintln("next block => rid:" + String(block.RoleId(), HEX) + ", uid_h:" + String(block.Uid_H, HEX) + ", uid_l:" + String(block.Uid_L, HEX));
+    
+    if (block.RoleType == Block::Role::None)
     {
         coreButtonPressed = false;
     }
@@ -189,6 +200,8 @@ void next()
     
     // ピッコロボに行動させる
     picco.Action(block.RoleType);
+
+    isProcessing = false;
 }
 
 void onReceived(const uint8_t* data, uint8_t size);
@@ -212,6 +225,7 @@ void setup()
     Serial.println();
     Serial.print("Connecting to ");
     Serial.print(ssid);
+    WiFi.config(ip, gateway, subnet, DNS);
     WiFi.begin(ssid, password);
     // WiFi.softAP(hostname, password);
     // delay(100);
@@ -304,14 +318,31 @@ void onReceived(const uint8_t* data, uint8_t size)
     }
 }
 
+void debugPrintln(const String& str)
+{
+    Serial.println(str);
+    ws.textAll("log " + String(str));
+}
+
+void resetBlock()
+{
+    debugPrintln("Resetting...");
+    graph = Graph(CORE_ID);
+    isScanning = false;
+    askCount = 0;
+    askSent = false;
+    lastSent = 0;
+    coreButtonPressed = false;
+    comm.sendToBlock(COM_RST);
+    debugPrintln("wrote : COM_RST");
+    debugPrintln("completed.");
+}
+
 void loop()
 {
-    if (askCount > RESENT_COUNT)
+    if (isScanning && askCount > RESENT_COUNT)
     {
-        if (isScanning)
-        {
-            Serial.println("Scan completed.");
-        }
+        debugPrintln("Scan completed.");
         isScanning = false;
         if (coreButtonPressed)
         {
@@ -319,9 +350,11 @@ void loop()
             next();
         }
     }
-    if (!isScanning && coreButtonPressed && lastNext + BLOCK_NEXT_INTERVAL < millis())
+    if (!isProcessing && !isScanning && coreButtonPressed
+        && (lastNext + Block::GetInterval(graph.GetCurrent().RoleType)) < millis())
     {
         lastNext = millis();
+        debugPrintln(String(lastNext));
         next();
     }
 
@@ -329,7 +362,7 @@ void loop()
     {
         comm.sendToBlock(COM_ASK, CORE_ID.RoleId(), CORE_ID.Uid_H, CORE_ID.Uid_L);
         delay(50);
-        Serial.println("wrote : COM_ASK");
+        debugPrintln("wrote : COM_ASK");
         askSent = true;
         askCount++;
         lastSent = millis();
@@ -341,20 +374,11 @@ void loop()
 
     if (!coreButtonPressed && digitalRead(PIN_BTN) == LOW)
     {
-        // pull-upなのでHIGH
+        resetBlock();
         coreButtonPressed = true;
-
-        // RESET
-        graph = Graph(CORE_ID);
-        isScanning = false;
-        askCount = 0;
-        askSent = false;
-        lastSent = 0;
-        comm.sendToBlock(COM_RST);
-
         // SCAN
         isScanning = true;
-
+        debugPrintln("core button pressed.");
     }
 
     comm.listen();
@@ -373,47 +397,6 @@ void loop()
         }
         break;
 
-        case 'i':
-        {
-            // Serial.println("set id...");
-            // comm.sendToBlock(COM_CFG);
-            // // comm.sendToBlock(COM_SET, 0x01, 0x11);
-            // comm.sendToBlock(COM_SET, 0x02, 0x11, 0x01, 0x01);
-            // comm.sendToBlock(COM_SET, 0x01, 0x01);
-            // comm.sendToBlock(COM_APL);
-            // Serial.println("sent.");
-
-        }
-        break;
-
-        case 'd':
-        {
-            // Serial.println("set debug mode...");
-            // comm.sendToBlock(COM_CFG);
-            // comm.sendToBlock(COM_SET, 0x01, 0x12);
-            // comm.sendToBlock(COM_APL);
-            // Serial.println("sent.");
-        }
-        break;
-
-        // case 'p':
-        //     {
-        //         for(unsigned int i = 0; i < MAX_BLOCK; i++)
-        //         {
-        //             if (ids[i].RoleId != Block::Role::None)
-        //             {
-        //                 Serial.print("[tid=");
-        //                 Serial.print(String(ids[i].RoleId(), HEX));
-        //                 Serial.print(", uid=");
-        //                 Serial.print(String(ids[i].Uid_H, HEX));
-        //                 Serial.print(String(ids[i].Uid_L, HEX));
-        //                 Serial.print("] -> ");
-        //             }
-        //         }
-        //         Serial.println("");
-        //         Serial.println("completed.");
-        //     }
-        //     break;
         case 'p':
             {
                 Serial.println(graph.ToString());
@@ -429,34 +412,9 @@ void loop()
 
         case 'r':
             {
-                Serial.println("Resetting...");
-                graph = Graph(CORE_ID);
-                isScanning = false;
-                askCount = 0;
-                askSent = false;
-                lastSent = 0;
-                comm.sendToBlock(COM_RST);
-                Serial.println("wrote : COM_RST");
-                Serial.println("completed.");
+                resetBlock();
             }
             break;
-
-        // case 'l':
-        //     {
-        //         if (ledState)
-        //         {
-        //             comm.sendToBlock(COM_TXD, 0x00, 0x01, DAT_LED, 0x00);
-        //             Serial.println("wrote : COM_TXD");
-        //             Serial.println("led off");
-        //         } else
-        //         {
-        //             comm.sendToBlock(COM_TXD, 0x00, 0x01, DAT_LED, 0x01);
-        //             Serial.println("wrote : COM_TXD");
-        //             Serial.println("led on");
-        //         }
-        //         ledState = !ledState;
-        //     }
-        //     break;
 
         case 'w':
             {

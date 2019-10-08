@@ -42,6 +42,17 @@ public:
         Block::BlockId const& p = edge.parent;
         std::shared_ptr<Node> parent_node = find(_root, p.Uid_H, p.Uid_L);
 
+        // 親がないときは、自分自身を抹消
+        if (parent_node == nullptr)
+        {
+            if (self_node == nullptr)
+            {
+                // 新たにメモリを確保していた場合、delete
+                node.reset();
+            }
+            return;
+        }
+
         // ノードを木にぶら下げる
         if(parent_node->right == nullptr)
         {
@@ -117,6 +128,11 @@ public:
             return Block::None;
         }
 
+        return _current->id;
+    }
+
+    Block::BlockId GetCurrent()
+    {
         return _current->id;
     }
 
@@ -209,7 +225,7 @@ private:
         clear_tree(node->right);
         clear_tree(node->left);
 
-        node = nullptr;
+        node.reset();
     }
 
 private:
