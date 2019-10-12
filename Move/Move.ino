@@ -207,6 +207,22 @@ void loop()
     int pattern = -1;
     switch (config.getMode())
     {
+    case Config::Mode::PRODUCTION:
+        {
+            if (idSent)
+            {
+                if (!ledState)
+                {
+                    digitalWrite(LED_PIN, LOW);
+                    ledState = false;
+                }
+            } else
+            {
+                pattern = 0;
+            }
+        }
+        break;
+
     case Config::Mode::DEBUG:
         {
             if (idSent)
