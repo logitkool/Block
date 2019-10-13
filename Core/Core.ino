@@ -1,5 +1,4 @@
-#include <Arduino.h>
-#include <WiFi.h>
+#include <Arduino.h>#include <WiFi.h>
 #include <ESPAsyncWebServer.h>
 #include <SPIFFS.h>
 #include <ESPmDNS.h>
@@ -18,7 +17,7 @@ const unsigned int MAX_BLOCK = 32;
 const unsigned int TIMEOUT = 500; // ms
 const unsigned int RESENT_COUNT = 3;
 const unsigned int INTERVAL = 750; // ms
-const unsigned int BTN_FETCH_INTERVAL = 500; // ms
+const unsigned int BTN_FETCH_INTERVAL = 1000; // ms
 
 BlockComm comm(BAUDRATE, 2);
 

@@ -68,23 +68,7 @@ public:
     {
         if(_current == nullptr)
         {
-            if(!for_start.empty())
-            {
-                if(for_counter.top().IsLimit())
-                {
-                    _current = for_start.top()->left;
-                    for_start.pop();
-                    for_counter.pop();
-                }
-                else
-                {
-                    for_counter.top().CountUp();
-                    _current = for_start.top()->right;
-                }
-
-                return _current->id;
-            }
-            else return Block::None;
+            return Block::None;
         }
 
         auto is_same_type
@@ -95,9 +79,8 @@ public:
 
             int limit = static_cast<uint8_t>(_current->id.RoleType) & 0x0F;
             for_counter.push(Counter(0, limit));
+            Serial.println(limit);
             _current = _current->right;
-
-            return _current->id;
         }
         else if(is_same_type(Block::Type::If, _current->id.RoleType))
         {
@@ -116,18 +99,36 @@ public:
 
             if(flag) _current = _current->right;
             else _current = _current->left;
-
-            return _current->id;
         }
-
-        _current = _current->right;
+        else
+        {
+            _current = _current->right;
+        }
 
         // 何もつながっていない場合
         if(_current == nullptr)
         {
-            return Block::None;
+            if(!for_start.empty() && !for_counter.empty())
+            {
+                if(for_counter.top().IsLimit())
+                {
+                    _current = for_start.top()->left;
+                    for_start.pop();
+                    for_counter.pop();
+                }
+                else
+                {
+                    for_counter.top().CountUp();
+                    _current = for_start.top()->right;
+                }
+            }
         }
 
+        if(_current == nullptr)
+        {
+            return Block::None;
+        }
+        
         return _current->id;
     }
 
