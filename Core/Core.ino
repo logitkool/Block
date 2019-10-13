@@ -18,6 +18,7 @@ const unsigned int MAX_BLOCK = 32;
 const unsigned int TIMEOUT = 500; // ms
 const unsigned int RESENT_COUNT = 3;
 const unsigned int INTERVAL = 750; // ms
+const unsigned int BTN_FETCH_INTERVAL = 500; // ms
 
 BlockComm comm(BAUDRATE, 2);
 
@@ -30,13 +31,15 @@ bool isScanning = false;
 bool askSent = false;
 int askCount = 0;
 int lastSent = 0;
-bool coreButtonPressed = false;
+unsigned long lastPressed = 0;
+bool isOperating = false;
 unsigned long lastNext = 0;
-bool isProcessing = false;
 
 const int PIN_LED_STATE = 32;
 const int PIN_LED_ERROR = 33;
 const int PIN_BTN = 23;
+
+std::stack<Block::BlockId> traceStack;
 
 // Wi-Fi
 const char* hostname = "floc_core_810001";
@@ -172,7 +175,7 @@ void onEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType 
         } else if (msgs[0] == "corebtn")
         {
             resetBlock();
-            coreButtonPressed = true;
+            isOperating = true;
             // SCAN
             isScanning = true;
             debugPrintln("core button pressed.");
@@ -185,14 +188,12 @@ void onEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType 
 
 void next()
 {
-    isProcessing = true;
-
     Block::BlockId block = graph.Next(picco);
     debugPrintln("next block => rid:" + String(block.RoleId(), HEX) + ", uid_h:" + String(block.Uid_H, HEX) + ", uid_l:" + String(block.Uid_L, HEX));
     
     if (block.RoleType == Block::Role::None)
     {
-        coreButtonPressed = false;
+        isOperating = false;
     }
 
     // LEDを光らせる
@@ -200,8 +201,6 @@ void next()
     
     // ピッコロボに行動させる
     picco.Action(block.RoleType);
-
-    isProcessing = false;
 }
 
 void onReceived(const uint8_t* data, uint8_t size);
@@ -301,10 +300,25 @@ void onReceived(const uint8_t* data, uint8_t size)
 
     switch (data[0])
     {
+    case COM_ASK:
+        {
+            Block::BlockId parent = Block::BlockId(data[1], data[2], data[3]);
+
+            graph.Insert(Edge(parent, CORE_ID));
+        }
+        break;
+        
     case COM_RET:
         {
             Block::BlockId parent = Block::BlockId(data[1], data[2], data[3]);
             Block::BlockId self = Block::BlockId(data[4], data[5], data[6]);
+
+            if (Block::IsSameType(Block::Type::For, self.RoleType)
+                || Block::IsSameType(Block::Type::If, self.RoleType))
+            {
+                traceStack.push(self);
+                comm.sendToBlock(COM_SWC, self.Uid_H, self.Uid_L, 0x01);
+            }
 
             graph.Insert(Edge(parent, self));
             
@@ -332,7 +346,8 @@ void resetBlock()
     askCount = 0;
     askSent = false;
     lastSent = 0;
-    coreButtonPressed = false;
+    isOperating = false;
+    while(!traceStack.empty()) traceStack.pop();
     comm.sendToBlock(COM_RST);
     debugPrintln("wrote : COM_RST");
     debugPrintln("completed.");
@@ -342,15 +357,26 @@ void loop()
 {
     if (isScanning && askCount > RESENT_COUNT)
     {
-        debugPrintln("Scan completed.");
-        isScanning = false;
-        if (coreButtonPressed)
+        if (!traceStack.empty())
         {
-            lastNext = millis();
-            next();
+            debugPrintln("trace stack pop.");
+            comm.sendToBlock(COM_SWC, traceStack.top().Uid_H, traceStack.top().Uid_L, 0x0);
+            traceStack.pop();
+
+            askSent = false;
+            askCount = 0;
+        } else
+        {
+            debugPrintln("Scan completed.");
+            isScanning = false;
+            if (isOperating)
+            {
+                lastNext = millis();
+                next();
+            }
         }
     }
-    if (!isProcessing && !isScanning && coreButtonPressed
+    if (isOperating && !isScanning
         && (lastNext + Block::GetInterval(graph.GetCurrent().RoleType)) < millis())
     {
         lastNext = millis();
@@ -372,10 +398,11 @@ void loop()
         askSent = false;
     }
 
-    if (!coreButtonPressed && digitalRead(PIN_BTN) == LOW)
+    if (lastPressed + BTN_FETCH_INTERVAL < millis() && digitalRead(PIN_BTN) == LOW)
     {
         resetBlock();
-        coreButtonPressed = true;
+        lastPressed = millis();
+        isOperating = true;
         // SCAN
         isScanning = true;
         debugPrintln("core button pressed.");

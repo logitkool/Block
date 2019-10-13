@@ -53,7 +53,7 @@ namespace Block
         switch (role)
         {
         case Role::MoveFront:
-        case Role::MoveBack:          return 7500;
+        case Role::MoveBack:          return 6000;
 
         case Role::TurnLeft:
         case Role::TurnRight:         return 8000;
