@@ -5,7 +5,7 @@ class Counter
 public:
     bool IsLimit()
     {
-        return _count < _limit;
+        return (_count >= _limit - 1);
     }
 
     void CountUp()

@@ -42,6 +42,17 @@ public:
         Block::BlockId const& p = edge.parent;
         std::shared_ptr<Node> parent_node = find(_root, p.Uid_H, p.Uid_L);
 
+        // 親がないときは、自分自身を抹消
+        if (parent_node == nullptr)
+        {
+            if (self_node == nullptr)
+            {
+                // 新たにメモリを確保していた場合、delete
+                node.reset();
+            }
+            return;
+        }
+
         // ノードを木にぶら下げる
         if(parent_node->right == nullptr)
         {
@@ -57,23 +68,7 @@ public:
     {
         if(_current == nullptr)
         {
-            if(!for_start.empty())
-            {
-                if(for_counter.top().IsLimit())
-                {
-                    _current = for_start.top()->left;
-                    for_start.pop();
-                    for_counter.pop();
-                }
-                else
-                {
-                    for_counter.top().CountUp();
-                    _current = for_start.top()->right;
-                }
-
-                return _current->id;
-            }
-            else return Block::None;
+            return Block::None;
         }
 
         auto is_same_type
@@ -84,9 +79,8 @@ public:
 
             int limit = static_cast<uint8_t>(_current->id.RoleType) & 0x0F;
             for_counter.push(Counter(0, limit));
+            Serial.println(limit);
             _current = _current->right;
-
-            return _current->id;
         }
         else if(is_same_type(Block::Type::If, _current->id.RoleType))
         {
@@ -105,18 +99,41 @@ public:
 
             if(flag) _current = _current->right;
             else _current = _current->left;
-
-            return _current->id;
         }
-
-        _current = _current->right;
+        else
+        {
+            _current = _current->right;
+        }
 
         // 何もつながっていない場合
         if(_current == nullptr)
         {
-            return Block::None;
+            if(!for_start.empty() && !for_counter.empty())
+            {
+                if(for_counter.top().IsLimit())
+                {
+                    _current = for_start.top()->left;
+                    for_start.pop();
+                    for_counter.pop();
+                }
+                else
+                {
+                    for_counter.top().CountUp();
+                    _current = for_start.top()->right;
+                }
+            }
         }
 
+        if(_current == nullptr)
+        {
+            return Block::None;
+        }
+        
+        return _current->id;
+    }
+
+    Block::BlockId GetCurrent()
+    {
         return _current->id;
     }
 
@@ -209,7 +226,7 @@ private:
         clear_tree(node->right);
         clear_tree(node->left);
 
-        node = nullptr;
+        node.reset();
     }
 
 private:

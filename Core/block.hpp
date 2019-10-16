@@ -47,6 +47,38 @@ namespace Block
     {
         return (static_cast<uint8_t>(role) & 0xF0) == static_cast<uint8_t>(type);
     }
+    
+    int GetInterval(Role role)
+    {
+        switch (role)
+        {
+        case Role::MoveFront:
+        case Role::MoveBack:          return 6000;
+
+        case Role::TurnLeft:
+        case Role::TurnRight:         return 8000;
+        
+        case Role::TurnLeft90:
+        case Role::TurnRight90:       return 12000;
+
+        case Role::ShakeLeftHand:
+        case Role::ShakeRightHand:
+        case Role::ShakeBothHands:    return 3000;
+
+        case Role::ShakeLeftHead:
+        case Role::ShakeRightHead:    return 4000;
+
+        case Role::IfBrightness:
+        case Role::IfObject:
+        case Role::For1:
+        case Role::For2:
+        case Role::For3:
+        case Role::For4:
+        case Role::For5:              return 1000;
+
+        default:                      return 0;
+        }
+    }
 
     struct BlockId
     {

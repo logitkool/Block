@@ -209,7 +209,7 @@ public:
     // dataが直前に送信されているか
     uint8_t IsSentPrevious(const uint8_t* data, uint8_t size)
     {
-        for(int i = 0; i < Min(size, MAX_COM_LEN); i++)
+        for(int i = 0; i < min(size, MAX_COM_LEN); i++)
         {
             if (prev_commands[i] == 0xFF || data[i] != prev_commands[i])
             {
@@ -227,7 +227,7 @@ private:
 
     bool useTwoPorts;
 
-    const unsigned int MAX_COM_LEN = 16;
+    const static unsigned int MAX_COM_LEN = 16;
     uint8_t prev_commands[MAX_COM_LEN];
 
     const unsigned long BAUDRATE;
